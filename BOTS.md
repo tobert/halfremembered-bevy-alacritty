@@ -93,10 +93,11 @@ gh pr create --fill
 | `jj git push -c @` | Push the current change to the remote. |
 
 ### Commit Description Format
+The `Why` section should succinctly explain the problem being solved. **It is highly recommended to include the original user prompt here for full context.**
 ```
 <type>: <summary>
 
-Why: <problem being solved>
+Why: <user prompt or problem being solved>
 Approach: <key decisions, algorithms, patterns>
 Status: <complete | next: remaining work>
 

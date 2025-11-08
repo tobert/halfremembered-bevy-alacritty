@@ -2,6 +2,21 @@
 //!
 //! PTYs are spawned in Startup system and run persistently.
 //! Uses portable-pty for cross-platform PTY spawning.
+//!
+//! ## Current Architecture: Arc<Mutex<>> Shared State
+//!
+//! Reader/writer are wrapped in Arc<Mutex<>> for thread-safe access from Bevy systems.
+//! This is a straightforward approach suitable for the MVP.
+//!
+//! ## Future Alternative: Channel-Based I/O Thread
+//!
+//! For improved decoupling, consider migrating to:
+//! - Dedicated I/O thread owning PTY reader (blocking reads)
+//! - mpsc::channel to send data to main Bevy loop
+//! - Bevy system receives data via mpsc::Receiver
+//!
+//! Benefits: No mutex contention, clearer separation of concerns.
+//! See: docs/reviews/phase-1.1-pty-spawning.md (Gemini's recommendation)
 
 use anyhow::{Context, Result};
 use bevy::prelude::*;
@@ -56,11 +71,18 @@ fn spawn_pty_internal() -> Result<PtyResource> {
         .openpty(pty_size)
         .context("Failed to create PTY pair")?;
 
-    // Spawn default shell
-    // On Unix: bash, zsh, sh (fallback chain)
-    // On Windows: powershell or cmd
+    // Spawn default shell with robust fallback chain
     #[cfg(unix)]
-    let shell_cmd = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+    let shell_cmd = std::env::var("SHELL").unwrap_or_else(|_| {
+        // Fallback chain: bash → zsh → sh
+        if std::path::Path::new("/bin/bash").exists() {
+            "/bin/bash".to_string()
+        } else if std::path::Path::new("/bin/zsh").exists() {
+            "/bin/zsh".to_string()
+        } else {
+            "/bin/sh".to_string()
+        }
+    });
 
     #[cfg(windows)]
     let shell_cmd = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
@@ -123,16 +145,42 @@ mod tests {
             writer.flush().expect("Flush failed");
         }
 
-        // Give shell time to process
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        // Poll for output with timeout (more robust than sleep)
+        let timeout = std::time::Duration::from_secs(2);
+        let start = std::time::Instant::now();
 
-        // Try to read output
-        {
+        loop {
+            if start.elapsed() > timeout {
+                panic!("Timeout waiting for PTY output after {}ms", timeout.as_millis());
+            }
+
             let mut reader = pty.reader.lock().unwrap();
             let mut buf = [0u8; 1024];
 
-            // Read should not panic (may return WouldBlock or data)
-            let _ = reader.read(&mut buf);
+            match reader.read(&mut buf) {
+                Ok(n) if n > 0 => {
+                    let output = String::from_utf8_lossy(&buf[..n]);
+
+                    // Look for our echoed command or output
+                    if output.contains("test") {
+                        // Success! We got output from the shell
+                        return;
+                    }
+                }
+                Ok(_) => {
+                    // No data yet, continue polling
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    // Expected for non-blocking reads, continue polling
+                }
+                Err(e) => {
+                    panic!("PTY read error: {}", e);
+                }
+            }
+
+            // Brief sleep to avoid busy-waiting
+            drop(reader);
+            std::thread::sleep(std::time::Duration::from_millis(10));
         }
     }
 }
