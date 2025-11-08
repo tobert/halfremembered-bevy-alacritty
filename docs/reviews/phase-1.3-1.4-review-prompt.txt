@@ -1,0 +1,234 @@
+Please review Phase 1.3 (PTY Polling) and Phase 1.4 (Keyboard Input) of the terminal emulation plugin.
+
+Context:
+- Building on Phase 1.1-1.2 (PTY spawning and Terminal state)
+- Completing bidirectional I/O: PTY → Terminal and Keyboard → PTY
+- Using Bevy ECS Update systems for polling
+- Arc<Mutex<>> for thread-safe I/O access
+
+Please review for:
+1. System scheduling and frame-based polling approach
+2. Borrow checker solutions (Arc::clone, try_lock usage)
+3. Buffer sizing (4KB per frame)
+4. Error handling for non-blocking I/O
+5. Keyboard mapping completeness for MVP
+6. Test coverage
+7. Performance implications of per-frame polling
+8. Alternative approaches or optimizations
+
+---
+
+## File: bevy-terminal/src/pty.rs (poll_pty function only)
+
+```rust
+/// Polls the PTY for output and feeds bytes to the terminal.
+///
+/// System: Update
+/// Runs: Every frame
+///
+/// Reads up to 4KB of data per frame from the PTY (non-blocking).
+/// Bytes are fed through the VTE processor and update the terminal grid.
+pub fn poll_pty(pty: Res<PtyResource>, mut term_state: ResMut<TerminalState>) {
+    const BUF_SIZE: usize = 4096;
+    let mut buf = [0u8; BUF_SIZE];
+
+    // Try to lock reader (non-blocking)
+    let mut reader = match pty.reader.try_lock() {
+        Ok(guard) => guard,
+        Err(_) => {
+            // Reader locked elsewhere, skip this frame
+            return;
+        }
+    };
+
+    // Read from PTY (non-blocking)
+    match reader.read(&mut buf) {
+        Ok(n) if n > 0 => {
+            // Feed bytes to terminal through VTE processor
+            // Clone Arc to avoid borrow checker issues
+            let term_arc = Arc::clone(&term_state.term);
+            let mut term = term_arc.lock();
+
+            term_state.processor.advance(&mut *term, &buf[..n]);
+            drop(term); // Release lock explicitly
+
+            trace!("📥 Read {} bytes from PTY", n);
+        }
+        Ok(_) => {
+            // No data available (0 bytes read)
+        }
+        Err(error) if error.kind() == ErrorKind::WouldBlock => {
+            // Expected for non-blocking reads
+        }
+        Err(error) => {
+            error!("❌ PTY read error: {}", error);
+        }
+    }
+}
+```
+
+---
+
+## File: bevy-terminal/src/input.rs (full file)
+
+```rust
+//! Keyboard input handling for terminal emulation.
+//!
+//! Captures Bevy keyboard events and converts them to appropriate byte sequences
+//! for the PTY. Handles:
+//! - ASCII characters (a-z, 0-9, symbols)
+//! - Special keys (Enter, Backspace, Tab, Escape)
+//! - Arrow keys (ANSI escape sequences)
+//! - Control sequences (Ctrl+C, Ctrl+D, etc.)
+
+use bevy::prelude::*;
+use std::io::Write;
+
+use crate::pty::PtyResource;
+
+/// Handles keyboard input and sends it to the PTY.
+///
+/// System: Update
+/// Runs: Every frame
+///
+/// MVP: Basic ASCII and common control sequences only.
+/// Future: Full terminal keyboard protocol support.
+pub fn handle_keyboard_input(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    pty: Res<PtyResource>,
+) {
+    // Process all just-pressed keys this frame
+    for key in keyboard.get_just_pressed() {
+        if let Some(bytes) = keycode_to_bytes(*key) {
+            // Write to PTY
+            if let Ok(mut writer) = pty.writer.try_lock() {
+                if let Err(error) = writer.write_all(&bytes) {
+                    error!("❌ Failed to write to PTY: {}", error);
+                } else if let Err(error) = writer.flush() {
+                    error!("❌ Failed to flush PTY writer: {}", error);
+                } else {
+                    trace!("⌨️  Sent {} bytes to PTY", bytes.len());
+                }
+            }
+        }
+    }
+}
+
+/// Converts Bevy KeyCode to terminal byte sequences.
+///
+/// Returns None for keys that don't map to terminal input (modifiers, F13+, etc.)
+fn keycode_to_bytes(key: KeyCode) -> Option<Vec<u8>> {
+    use KeyCode::*;
+
+    match key {
+        // Letters (a-z)
+        KeyA => Some(b"a".to_vec()),
+        // ... (full mapping in actual code)
+        KeyZ => Some(b"z".to_vec()),
+
+        // Numbers (0-9)
+        Digit0 => Some(b"0".to_vec()),
+        // ... (full mapping)
+        Digit9 => Some(b"9".to_vec()),
+
+        // Special characters
+        Space => Some(b" ".to_vec()),
+        Minus => Some(b"-".to_vec()),
+        // ... (full list of symbols)
+
+        // Control keys
+        Enter => Some(b"\r".to_vec()),
+        Tab => Some(b"\t".to_vec()),
+        Backspace => Some(b"\x7f".to_vec()),
+        Escape => Some(b"\x1b".to_vec()),
+
+        // Arrow keys (ANSI escape sequences)
+        ArrowUp => Some(b"\x1b[A".to_vec()),
+        ArrowDown => Some(b"\x1b[B".to_vec()),
+        ArrowRight => Some(b"\x1b[C".to_vec()),
+        ArrowLeft => Some(b"\x1b[D".to_vec()),
+
+        // Home/End
+        Home => Some(b"\x1b[H".to_vec()),
+        End => Some(b"\x1b[F".to_vec()),
+
+        // Page Up/Down
+        PageUp => Some(b"\x1b[5~".to_vec()),
+        PageDown => Some(b"\x1b[6~".to_vec()),
+
+        // Delete/Insert
+        Delete => Some(b"\x1b[3~".to_vec()),
+        Insert => Some(b"\x1b[2~".to_vec()),
+
+        // Modifiers and other keys: no mapping
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic_ascii() {
+        assert_eq!(keycode_to_bytes(KeyCode::KeyA), Some(b"a".to_vec()));
+        assert_eq!(keycode_to_bytes(KeyCode::Digit1), Some(b"1".to_vec()));
+        assert_eq!(keycode_to_bytes(KeyCode::Space), Some(b" ".to_vec()));
+    }
+
+    #[test]
+    fn test_special_keys() {
+        assert_eq!(keycode_to_bytes(KeyCode::Enter), Some(b"\r".to_vec()));
+        assert_eq!(keycode_to_bytes(KeyCode::Tab), Some(b"\t".to_vec()));
+        assert_eq!(keycode_to_bytes(KeyCode::Backspace), Some(b"\x7f".to_vec()));
+    }
+
+    #[test]
+    fn test_arrow_keys() {
+        assert_eq!(keycode_to_bytes(KeyCode::ArrowUp), Some(b"\x1b[A".to_vec()));
+        assert_eq!(keycode_to_bytes(KeyCode::ArrowDown), Some(b"\x1b[B".to_vec()));
+        assert_eq!(keycode_to_bytes(KeyCode::ArrowRight), Some(b"\x1b[C".to_vec()));
+        assert_eq!(keycode_to_bytes(KeyCode::ArrowLeft), Some(b"\x1b[D".to_vec()));
+    }
+
+    #[test]
+    fn test_unmapped_keys() {
+        assert_eq!(keycode_to_bytes(KeyCode::ShiftLeft), None);
+        assert_eq!(keycode_to_bytes(KeyCode::ControlLeft), None);
+        assert_eq!(keycode_to_bytes(KeyCode::AltLeft), None);
+    }
+}
+```
+
+---
+
+## Additional Context
+
+**Plugin Integration:**
+Both systems run in Update, added as:
+```rust
+.add_systems(Update, (
+    pty::poll_pty,
+    input::handle_keyboard_input,
+))
+```
+
+**Design Decisions:**
+1. 4KB buffer chosen as standard terminal chunk size
+2. try_lock used to avoid blocking the frame if I/O is busy elsewhere
+3. Arc::clone in poll_pty to satisfy borrow checker (term + processor access)
+4. MVP excludes Shift/Ctrl/Alt modifiers (future: handle Ctrl+C, Ctrl+D properly)
+5. Letters are lowercase only in MVP (Shift handling future)
+
+**Performance Considerations:**
+- Both systems run every frame (~60 FPS)
+- Non-blocking I/O prevents frame drops
+- Small overhead from try_lock checks
+- VTE processor is optimized (alacritty production code)
+
+**Testing:**
+All 6 unit tests pass:
+- 2 PTY tests from Phase 1.1
+- 4 input mapping tests (new)
+
+Please provide feedback on system architecture, borrow patterns, MVP scope, and any issues or improvements you see.

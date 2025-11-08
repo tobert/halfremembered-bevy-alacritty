@@ -1,6 +1,7 @@
-//! PTY lifecycle management.
+//! PTY lifecycle management and polling.
 //!
 //! PTYs are spawned in Startup system and run persistently.
+//! Polling system runs in Update to read PTY output and feed to terminal.
 //! Uses portable-pty for cross-platform PTY spawning.
 //!
 //! ## Current Architecture: Arc<Mutex<>> Shared State
@@ -21,8 +22,10 @@
 use anyhow::{Context, Result};
 use bevy::prelude::*;
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtySize};
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
+
+use crate::terminal::TerminalState;
 
 /// Resource holding PTY handles for the terminal.
 ///
@@ -113,6 +116,46 @@ fn spawn_pty_internal() -> Result<PtyResource> {
         writer: Arc::new(Mutex::new(Box::new(writer))),
         child,
     })
+}
+
+/// Polls the PTY for output and feeds bytes to the terminal.
+///
+/// System: Update
+/// Runs: Every frame
+///
+/// Reads up to 4KB of data per frame from the PTY (non-blocking).
+/// Bytes are fed through the VTE processor and update the terminal grid.
+pub fn poll_pty(pty: Res<PtyResource>, mut term_state: ResMut<TerminalState>) {
+    const BUF_SIZE: usize = 4096;
+    let mut buf = [0u8; BUF_SIZE];
+
+    // Try to lock reader (non-blocking)
+    let mut reader = match pty.reader.try_lock() {
+        Ok(guard) => guard,
+        Err(_) => {
+            // Reader locked elsewhere, skip this frame
+            return;
+        }
+    };
+
+    // Read from PTY (non-blocking)
+    match reader.read(&mut buf) {
+        Ok(0) => {
+            // EOF: PTY child process has exited
+            info!("📭 PTY EOF - child process exited");
+        }
+        Ok(n) => {
+            // Feed bytes to terminal
+            term_state.process_bytes(&buf[..n]);
+            trace!("📥 Read {} bytes from PTY", n);
+        }
+        Err(error) if error.kind() == ErrorKind::WouldBlock => {
+            // Expected for non-blocking reads
+        }
+        Err(error) => {
+            error!("❌ PTY read error: {}", error);
+        }
+    }
 }
 
 #[cfg(test)]

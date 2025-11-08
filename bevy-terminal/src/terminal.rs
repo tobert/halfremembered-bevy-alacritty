@@ -8,6 +8,7 @@ use alacritty_terminal::vte::ansi::Processor;
 use bevy::prelude::*;
 use std::sync::Arc;
 
+use crate::input;
 use crate::pty;
 
 /// Simple dimensions struct for MVP (hardcoded 120×30).
@@ -82,6 +83,14 @@ impl TerminalState {
             rows: ROWS,
         }
     }
+
+    /// Process bytes from PTY through VTE parser into terminal grid.
+    ///
+    /// Handles locking internally for clean API.
+    pub fn process_bytes(&mut self, bytes: &[u8]) {
+        let mut term = self.term.lock();
+        self.processor.advance(&mut *term, bytes);
+    }
 }
 
 impl Default for TerminalState {
@@ -112,15 +121,17 @@ impl Plugin for TerminalPlugin {
             .add_systems(Startup, pty::spawn_pty)
             // Phase 1.2: Terminal State
             .init_resource::<TerminalState>()
+            // Phase 1.3-1.4: PTY Polling and Input
+            .add_systems(Update, (
+                pty::poll_pty,
+                input::handle_keyboard_input,
+            ))
             // TODO: Add remaining resources
             // .init_resource::<TerminalTexture>()
             // .init_resource::<GlyphAtlas>()
             // TODO: Add remaining systems
             // .add_systems(Update, (
-            //     poll_pty,
-            //     update_terminal_grid,
             //     render_to_texture,
-            //     handle_input,
             // ))
             // TODO: Add events
             // .add_event::<TerminalEvent>()

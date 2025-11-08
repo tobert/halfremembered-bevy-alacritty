@@ -15,44 +15,69 @@ Unlike git commits, a `jj` change has a stable ID that survives rebases and amen
 Follow this sequence for every task.
 
 ### Step 1: Understand Context
-Always begin by reviewing the history of changes you've authored. This is your memory.
-
+Always begin by reading the persistent context store. This is your working memory.
 ```bash
-# 1. See your last 5 changes
-jj log -r 'mine()' -n 5
+# 1. See your last 10 changes (your memory)
+jj log -r 'mine()' -n 10
 
-# 2. Review the full context of the most recent change
+# 2. See ALL recent project activity (what others are doing)
+jj log -n 20
+
+# 3. Review the current change in detail
 jj show @
+
+# 4. See how a change evolved (the reasoning trace)
+jj obslog -p
 ```
-- Read the change descriptions carefully. They contain the "why" behind the code.
-- Use `jj obslog` to understand the evolution of a change if needed.
+
+**What to extract from descriptions:**
+- **Decisions & tradeoffs**: Why this approach over alternatives?
+- **Blockers & next steps**: What couldn't be completed? What's needed next?
+- **Architectural context**: How does this fit into the larger system?
+- **Failures & learnings**: What didn't work and why?
+
+**Before starting new work:**
+- Check if someone else is already working on this (`jj log -n 20`)
+- Read related changes to understand existing patterns
+- Look for "Status: next:" entries that describe follow-on work
 
 ### Step 2: Start New Work
 Create a new change with a clear, descriptive message.
-
 ```bash
 jj new -m "<type>: <what you are building>"
 ```
 - **Types**: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
 
 ### Step 3: Implement and Iterate
-As you work, continuously update the change's description. This is how you "think" and record your process in the persistent context store.
-
+**Treat descriptions as living documents.** Update them as your understanding evolves.
 ```bash
+# After learning something new or changing approach
+jj describe
+
+# Review before updating
+jj show @
+
 # Review your work-in-progress
 jj diff
-
-# Update the description with your approach, findings, and status
-jj describe -m "Why: <problem being solved>
-Approach: <key decisions, algorithms, patterns>
-Status: <complete | next: remaining work>"
 ```
-- **Update descriptions frequently.** Don't wait until the end.
-- Use `jj squash` to fold fixups and minor corrections into the main change, keeping the history clean and atomic.
+
+**When to update descriptions:**
+- When you discover the problem is different than you thought
+- When you try an approach that doesn't work (document WHY)
+- When you make a key architectural decision
+- When you discover a blocker or dependency
+- Before taking a break (preserve your mental state)
+
+**What to document:**
+- Approaches tried and abandoned (save future agents time)
+- Surprising discoveries about the codebase
+- Performance characteristics discovered
+- Dependencies or interactions discovered
+
+Use `jj squash` to fold fixups and minor corrections into the main change, keeping the history clean and atomic.
 
 ### Step 4: Finalize and Sync
 Once the work is complete, tested, and builds pass, push the change.
-
 ```bash
 # Push only the current change to GitHub
 jj git push -c @
@@ -84,8 +109,10 @@ gh pr create --fill
 | :--- | :--- |
 | `jj new -m "..."` | Start a new atomic change. |
 | `jj describe -m "..."` | Update the description (the persistent context). **Use frequently.** |
-| `jj log -r 'mine()' -n 5` | Review your recent work history. |
+| `jj log -r 'mine()' -n 10` | Review your recent work history (your memory). |
+| `jj log -n 20` | See all recent project activity. |
 | `jj show <id>` | Read the full diff and description of a change. |
+| `jj obslog -p` | See how a change evolved over time. **This is the reasoning trace** - shows abandoned approaches, refinements, and learning. |
 | `jj diff` | Review current working copy changes. |
 | `jj squash` | Fold the current change into its parent. |
 | `jj split` | Separate a change into smaller, more logical units. |
@@ -93,19 +120,74 @@ gh pr create --fill
 | `jj git push -c @` | Push the current change to the remote. |
 
 ### Commit Description Format
-The `Why` section should succinctly explain the problem being solved. **It is highly recommended to include the original user prompt here for full context.**
+**The description is a letter to your future self and other agents.**
 ```
 <type>: <summary>
 
-Why: <user prompt or problem being solved>
+Why: <original user prompt or problem being solved>
 Approach: <key decisions, algorithms, patterns>
-Status: <complete | next: remaining work>
+Tried: <approaches that didn't work>
+Context: <architectural decisions, dependencies discovered>
+Status: <complete | blocked: <reason> | next: <specific tasks>>
 
 Co-authored-by: <Your Name> <your@email>
 ```
+
+- **Why**: Include the original user prompt when possible - full context matters
+- **Tried**: Document failed approaches - this is crucial learning
+- **Status**: Be specific about blockers and next steps
 
 **Agent Attribution:**
 - **Claude**: `Co-authored-by: Claude <claude@anthropic.com>`
 - **Gemini**: `Co-authored-by: Gemini <gemini@google.com>`
 - **Kimi**: `Co-authored-by: Kimi <kimi@moonshot.ai>`
+
+## 4. GitHub Integration
+
+**GitHub CLI (`gh`):**
+Use `gh` for GitHub operations without leaving the terminal:
+```bash
+gh pr create --fill          # Create PR from jj description
+gh pr status                 # Check PR status  
+gh pr checks                 # View CI results
+gh issue list                # Check issues
+gh issue view <number>       # Read issue details
+```
+
+The `--fill` flag pulls title and body from your jj description - another reason to keep descriptions rich and clear.
+
+## 5. Cross-Session Context Patterns
+
+jj's power is in context preservation across sessions and agents.
+
+**Starting a new session:**
+1. `jj log -r 'mine()' -n 10` - What was I working on?
+2. `jj show @` - What's my current state?
+3. `jj log -n 20` - What happened since I left?
+
+**Picking up someone else's work:**
+1. Find their change: `jj log -n 20`
+2. Read their description: `jj show <change-id>`
+3. See their reasoning: `jj obslog <change-id> -p`
+4. Create your change building on theirs: `jj new <their-change-id>`
+
+**Avoiding duplicate work:**
+- Always check `jj log -n 20` before starting something new
+- Search descriptions: `jj log | grep -i "keyword"`
+- Check for "Status: blocked" or "Status: next:" entries
+
+**Debugging strange behavior:**
+- Use `jj obslog -p` to see what changed and when
+- Check descriptions for "gotcha" or "caveat" notes
+- Look for changes that touch the same files
+
+## Remember
+
+**jj changes are not git commits.** They are:
+- Living documents that evolve with your understanding
+- Persistent memory that survives rebases  
+- Context transfer mechanisms between agents and sessions
+- Reasoning traces via obslog
+
+**Your description quality directly impacts the next agent's ability to succeed.** Write for them.
 
