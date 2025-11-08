@@ -41,7 +41,10 @@ Jj changes are **persistent context stores**. Change descriptions survive rebase
 ### Starting New Work
 ```bash
 jj new -m "feat: <what you're building>"
-jj describe  # Expand description as you learn
+
+# Update description (choose one):
+jj describe           # Opens editor (vim/nano) - for humans
+jj describe -m "..."  # Non-interactive - for agents/scripts
 ```
 
 ### Reading Context from Previous Work
@@ -73,8 +76,9 @@ Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
 
 ### During Development
 - `jj diff` - review current work
-- `jj describe` - update description as understanding evolves
-- `jj squash -i` - fold debug/fixup commits into parent when cleaning up
+- `jj describe -m "..."` - update description as understanding evolves (use `-m` for non-interactive)
+- `jj squash` - fold current change into parent
+- `jj squash -i` - interactively choose what to squash
 - `jj split` - separate concerns discovered mid-work
 
 ### Syncing to GitHub

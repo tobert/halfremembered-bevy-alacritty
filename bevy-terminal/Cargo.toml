@@ -1,0 +1,47 @@
+[package]
+name = "bevy-terminal"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Bevy plugin for embedding terminal emulation via render-to-texture"
+repository = "https://github.com/atobey/halfremembered-bevy-alacritty"
+keywords = ["bevy", "terminal", "emulator", "game", "pty"]
+categories = ["game-development", "emulators"]
+
+[dependencies]
+# Bevy with features for quality rendering
+bevy = { workspace = true, features = [
+    "bevy_asset",
+    "bevy_sprite",
+    "bevy_text",
+    "bevy_ui",
+    "bevy_render",
+    "bevy_core_pipeline",
+    "png",
+    "multi_threaded",
+] }
+
+# Terminal emulation
+alacritty_terminal = { workspace = true }
+vte = { workspace = true }
+
+# PTY management
+portable-pty = { workspace = true }
+
+# Font rendering
+ab_glyph = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Utilities
+log = { workspace = true }
+
+[dev-dependencies]
+bevy = { workspace = true, default-features = true }
+
+[features]
+default = []

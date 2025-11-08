@@ -1,0 +1,45 @@
+[workspace]
+members = [
+    "bevy-terminal",
+    "examples/claude_crt",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Amy Tobey <tobert@gmail.com>"]
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+# Core engine
+bevy = { version = "0.17", default-features = false }
+
+# Terminal emulation
+alacritty_terminal = "0.25"
+vte = "0.13"
+
+# PTY management
+portable-pty = "0.8"
+
+# Font rendering
+ab_glyph = "0.2"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Utilities
+log = "0.4"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

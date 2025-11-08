@@ -1,0 +1,11 @@
+[package]
+name = "claude_crt"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+bevy = { workspace = true, default-features = true }
+bevy-terminal = { path = "../../bevy-terminal" }
+anyhow = { workspace = true }
