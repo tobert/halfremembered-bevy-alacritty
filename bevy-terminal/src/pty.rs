@@ -226,4 +226,42 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
     }
+
+    #[test]
+    fn test_pty_child_exit() {
+        let mut pty = spawn_pty_internal().expect("PTY spawn failed");
+
+        // Write exit command
+        {
+            let mut writer = pty.writer.lock().unwrap();
+            writer.write_all(b"exit\n").expect("Write failed");
+            writer.flush().expect("Flush failed");
+        }
+
+        // Poll for child exit with timeout
+        let timeout = std::time::Duration::from_secs(2);
+        let start = std::time::Instant::now();
+
+        let final_status = loop {
+            if start.elapsed() > timeout {
+                panic!("Timeout waiting for child process to exit");
+            }
+
+            match pty.child.try_wait() {
+                Ok(Some(status)) => {
+                    break status;
+                }
+                Ok(None) => {
+                    // Process not exited yet, continue polling
+                }
+                Err(e) => {
+                    panic!("Error waiting for child process: {}", e);
+                }
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        };
+
+        assert!(final_status.success(), "Child process should have exited successfully");
+    }
 }

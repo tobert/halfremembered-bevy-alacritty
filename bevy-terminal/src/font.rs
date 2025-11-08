@@ -3,7 +3,7 @@
 //! Loads Cascadia Mono and calculates cell dimensions for terminal rendering.
 //! Uses ab_glyph for font parsing and rasterization.
 
-use ab_glyph::{FontArc, PxScale, ScaleFont};
+use ab_glyph::{Font, FontArc, PxScale, ScaleFont};
 use anyhow::{Context, Result};
 use bevy::prelude::*;
 
@@ -42,8 +42,8 @@ impl FontMetrics {
     /// # Returns
     /// Loaded font with calculated cell dimensions
     pub fn load(font_bytes: &[u8], font_size: f32) -> Result<Self> {
-        // Parse font with ab_glyph
-        let font = FontArc::try_from_slice(font_bytes)
+        // Parse font with ab_glyph (must own the data, so convert to Vec)
+        let font = FontArc::try_from_vec(font_bytes.to_vec())
             .context("Failed to parse font file - invalid TTF/OTF format")?;
 
         let scale = PxScale::from(font_size);
@@ -54,7 +54,6 @@ impl FontMetrics {
         let cell_width = scaled_font.h_advance(glyph_id);
 
         // Calculate cell height from font vertical metrics
-        let v_metrics = scaled_font.height();
         let ascent = scaled_font.ascent();
         let descent = scaled_font.descent();
         let cell_height = ascent - descent;

@@ -24,12 +24,10 @@
 //! }
 //! ```
 
-use bevy::prelude::*;
-
-mod atlas;
+pub mod atlas;
 mod colors;
 mod events;
-mod font;
+pub mod font;
 mod input;
 mod pty;
 mod renderer;

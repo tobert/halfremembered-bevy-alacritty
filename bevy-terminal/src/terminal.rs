@@ -8,6 +8,8 @@ use alacritty_terminal::vte::ansi::Processor;
 use bevy::prelude::*;
 use std::sync::Arc;
 
+use crate::atlas::GlyphAtlas;
+use crate::font::FontMetrics;
 use crate::input;
 use crate::pty;
 
@@ -126,9 +128,10 @@ impl Plugin for TerminalPlugin {
                 pty::poll_pty,
                 input::handle_keyboard_input,
             ))
+            // Phase 2: Font and Atlas
+            .add_systems(Startup, initialize_font_and_atlas)
             // TODO: Add remaining resources
             // .init_resource::<TerminalTexture>()
-            // .init_resource::<GlyphAtlas>()
             // TODO: Add remaining systems
             // .add_systems(Update, (
             //     render_to_texture,
@@ -145,4 +148,26 @@ impl Default for TerminalPlugin {
     fn default() -> Self {
         Self
     }
+}
+
+/// Startup system to initialize font metrics and glyph atlas.
+///
+/// Loads Cascadia Mono and generates the full glyph atlas with
+/// ASCII, box-drawing, and block element characters.
+fn initialize_font_and_atlas(mut commands: Commands) {
+    info!("🔤 Loading font and generating glyph atlas...");
+
+    let font_metrics = FontMetrics::load_cascadia_mono()
+        .expect("Failed to load Cascadia Mono font");
+
+    let atlas = GlyphAtlas::generate_mvp(&font_metrics)
+        .expect("Failed to generate glyph atlas");
+
+    info!(
+        "✅ Font and atlas ready: {}×{} cells, {} glyphs",
+        atlas.cell_width, atlas.cell_height, atlas.uv_map.len()
+    );
+
+    commands.insert_resource(font_metrics);
+    commands.insert_resource(atlas);
 }
