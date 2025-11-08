@@ -1,3 +1,25 @@
+Please review the following Rust code for a Bevy terminal emulation plugin. This is Phase 1.1: PTY Spawning.
+
+Context:
+- Building a render-to-texture terminal plugin for Bevy 0.17
+- This module handles persistent PTY lifecycle management
+- Uses portable-pty for cross-platform support
+- PTY spawns in Startup system and runs until app shutdown
+- Reader/writer wrapped in Arc<Mutex<>> for thread-safety
+
+Please review for:
+1. Rust idioms and best practices
+2. Error handling patterns (we use anyhow::Result)
+3. Thread-safety of the Arc<Mutex<>> approach
+4. Potential issues with the non-blocking I/O strategy
+5. Cross-platform compatibility (Unix/Windows)
+6. Test coverage and quality
+7. Any performance considerations
+8. Alternative approaches we should consider
+
+Here's the code from bevy-terminal/src/pty.rs:
+
+---FILE START---
 //! PTY lifecycle management.
 //!
 //! PTYs are spawned in Startup system and run persistently.
@@ -136,3 +158,13 @@ mod tests {
         }
     }
 }
+---FILE END---
+
+Additional context:
+- This is part of a larger terminal plugin being built incrementally
+- Next phase will integrate alacritty_terminal for grid management
+- We prioritize correctness and clarity over performance
+- Strong types and descriptive names are preferred
+- No unwrap() calls in production code (only in tests with expect())
+
+Please provide your review covering the areas listed above. Be direct and specific about any issues or improvements.

@@ -1,6 +1,7 @@
 //! Core terminal plugin definition.
 
 use bevy::prelude::*;
+use crate::pty;
 
 /// Bevy plugin for terminal emulation.
 ///
@@ -20,12 +21,13 @@ impl Plugin for TerminalPlugin {
         info!("🖥️  Initializing TerminalPlugin (render-to-texture)");
 
         app
+            // Phase 1.1: PTY Spawning
+            .add_systems(Startup, pty::spawn_pty)
             // TODO: Add resources
             // .init_resource::<TerminalState>()
             // .init_resource::<TerminalTexture>()
             // .init_resource::<GlyphAtlas>()
-            // TODO: Add systems
-            // .add_systems(Startup, spawn_pty)
+            // TODO: Add remaining systems
             // .add_systems(Update, (
             //     poll_pty,
             //     update_terminal_grid,

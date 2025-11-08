@@ -1,61 +1,98 @@
-# BOTS.md - Coding Agent Context for HalfRemembered Launcher
+# BOTS.md: LLM Agent Development Protocol
 
-HalfRemembered Bevy Plugin for Alacritty
+This document outlines the development protocol for LLM agents working on the HalfRemembered project. Adherence to these guidelines is critical for effective collaboration and high-quality output.
 
-## Development Guidelines
+## 1. Core Principle: Jujutsu as a Persistent Context Store
 
-**Teamwork**
-- We work as a team, ask me questions too.
-- We will collaborate with Gemini and other agents for reviews and things they excel at. Gemini is particularly good at
-  large context tasks. Claude is our planner and primary coder, though Gemini and others may contribute.
-- Code should have strong types, using modern language idioms.
-- No shortcuts. No hacks.
-- Refactor code as we go.
-- No silent fallbacks.
-- Errors are good.
+The most important concept is that **Jujutsu (jj) changes are persistent context stores**.
 
-**Error Handling**:
-- Use `anyhow::Result` for all fallible operations
-- Never use `unwrap()` - always propagate errors with `?`
-- Add context with `.context()` for debugging
-- Never silently discard errors with `let _ =`
-- Handle reconnection gracefully on network failures
+Unlike git commits, a `jj` change has a stable ID that survives rebases and amendments. The description associated with this change is our shared, persistent memory. When you read a change description, you are reading the reasoning and intent of the previous agent. When you write one, you are passing critical context to the next.
 
-**Code Style**:
-- Prioritize correctness and clarity over performance
-- No organizational comments that summarize code
-- Comments should only explain "why" when non-obvious
-- Implement functionality in existing files unless it's a new logical component
-- Avoid `mod.rs` files - use `src/module_name.rs` directly
-- Use full words for variable names (no abbreviations)
+**Your primary goal is to maintain the integrity and clarity of this context.**
 
-# 🌳 Jujutsu (jj) Version Control
+## 2. Agent Workflow Checklist
 
-We use Jujutsu (jj) which uses git as a storage backend. Jj provides better workflow for agent collaboration with persistent change IDs and rich descriptions.
+Follow this sequence for every task.
 
-## Core Principle
-Jj changes are **persistent context stores**. Change descriptions survive rebases and serve as memory between agent sessions. Write them for the next agent (or yourself).
+### Step 1: Understand Context
+Always begin by reviewing the history of changes you've authored. This is your memory.
 
-## Essential Commands
-
-### Starting New Work
 ```bash
-jj new -m "feat: <what you're building>"
+# 1. See your last 5 changes
+jj log -r 'mine()' -n 5
 
-# Update description (choose one):
-jj describe           # Opens editor (vim/nano) - for humans
-jj describe -m "..."  # Non-interactive - for agents/scripts
+# 2. Review the full context of the most recent change
+jj show @
+```
+- Read the change descriptions carefully. They contain the "why" behind the code.
+- Use `jj obslog` to understand the evolution of a change if needed.
+
+### Step 2: Start New Work
+Create a new change with a clear, descriptive message.
+
+```bash
+jj new -m "<type>: <what you are building>"
+```
+- **Types**: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
+
+### Step 3: Implement and Iterate
+As you work, continuously update the change's description. This is how you "think" and record your process in the persistent context store.
+
+```bash
+# Review your work-in-progress
+jj diff
+
+# Update the description with your approach, findings, and status
+jj describe -m "Why: <problem being solved>
+Approach: <key decisions, algorithms, patterns>
+Status: <complete | next: remaining work>"
+```
+- **Update descriptions frequently.** Don't wait until the end.
+- Use `jj squash` to fold fixups and minor corrections into the main change, keeping the history clean and atomic.
+
+### Step 4: Finalize and Sync
+Once the work is complete, tested, and builds pass, push the change.
+
+```bash
+# Push only the current change to GitHub
+jj git push -c @
+
+# Create a pull request using the rich description
+gh pr create --fill
 ```
 
-### Reading Context from Previous Work
-```bash
-jj log -r 'mine()' -n 10        # Your recent changes (mine() = changes you authored)
-jj show <change-id>              # Full diff + description
-jj obslog                        # Evolution of current change (obslog = operation history)
-```
+## 3. Technical Guidelines
 
-### Description Format
-Use clear, technical prose:
+### Code Style & Quality
+- **Correctness & Clarity First**: Prioritize readable, correct code over premature optimization.
+- **Strong Types**: Use modern, idiomatic types.
+- **No Shortcuts**: Avoid hacks or workarounds. Refactor messy code as you encounter it.
+- **No Organizational Comments**: Do not write comments that summarize what code does. Code should be self-documenting.
+- **"Why" Comments Only**: Comments should only explain the "why" behind a non-obvious implementation choice.
+- **File Structure**: Add new functionality to existing files unless it represents a new, distinct logical component. Avoid `mod.rs`.
+- **Naming**: Use full, descriptive words for variables. No abbreviations.
+
+### Error Handling
+- **`anyhow::Result`**: Use for all fallible operations.
+- **No `unwrap()`**: Always propagate errors with `?`.
+- **Add Context**: Use `.context()` to provide useful debugging information on errors.
+- **No Silent Errors**: Never discard errors with `let _ =`.
+- **Graceful Failures**: Handle potential network failures (e.g., reconnection logic) gracefully.
+
+### Jujutsu (jj) Command Reference
+| Command | Agent Usage |
+| :--- | :--- |
+| `jj new -m "..."` | Start a new atomic change. |
+| `jj describe -m "..."` | Update the description (the persistent context). **Use frequently.** |
+| `jj log -r 'mine()' -n 5` | Review your recent work history. |
+| `jj show <id>` | Read the full diff and description of a change. |
+| `jj diff` | Review current working copy changes. |
+| `jj squash` | Fold the current change into its parent. |
+| `jj split` | Separate a change into smaller, more logical units. |
+| `jj abandon` | Discard the current change entirely. |
+| `jj git push -c @` | Push the current change to the remote. |
+
+### Commit Description Format
 ```
 <type>: <summary>
 
@@ -66,60 +103,8 @@ Status: <complete | next: remaining work>
 Co-authored-by: <Your Name> <your@email>
 ```
 
-Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
-
 **Agent Attribution:**
-- Claude should add: `Co-authored-by: Claude <claude@anthropic.com>`
-- Gemini should add: `Co-authored-by: Gemini <gemini@google.com>`
-- Kimi should add: `Co-authored-by: Kimi <kimi@moonshot.ai>`
-- Human commits don't need attribution line
+- **Claude**: `Co-authored-by: Claude <claude@anthropic.com>`
+- **Gemini**: `Co-authored-by: Gemini <gemini@google.com>`
+- **Kimi**: `Co-authored-by: Kimi <kimi@moonshot.ai>`
 
-### During Development
-- `jj diff` - review current work
-- `jj describe -m "..."` - update description as understanding evolves (use `-m` for non-interactive)
-- `jj squash` - fold current change into parent
-- `jj squash -i` - interactively choose what to squash
-- `jj split` - separate concerns discovered mid-work
-
-### Syncing to GitHub
-```bash
-# Only when: code works, builds pass, tests pass
-jj git push -c @    # Push current change
-```
-
-**GitHub CLI (`gh`):**
-Agents can use `gh` for GitHub operations:
-```bash
-gh pr create --fill          # Create PR from jj description
-gh pr status                 # Check PR status
-gh pr checks                 # View CI results
-gh issue list                # Check issues
-gh issue view <number>       # Read issue details
-```
-
-## Agent Success Patterns
-
-**🎯 Precision through context:**
-- Always check `jj log -r 'mine()' -n 5` at session start
-- Read change descriptions - they contain decisions, tradeoffs, context
-- Update descriptions when design changes
-
-**⚡ Atomic changes:**
-- One logical unit per change (feature, bugfix, refactor)
-- Squash fixups before pushing: `jj squash -i`
-
-**🧠 Memory preservation:**
-- Change IDs persist across rebases (look for k-prefix like `kmxyz123`)
-- Rich descriptions = cross-session memory
-- Obslog shows reasoning evolution: `jj obslog -p`
-
-## Quick Reference
-```bash
-jj help <command>    # Detailed help
-jj log -r @          # Current change
-jj abandon           # Discard current change
-jj restore           # Undo working copy changes
-```
-
-**Remember:** Jj's superpower is persistent change identity + rich descriptions. 
-Use both for agent coordination.

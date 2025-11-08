@@ -11,7 +11,7 @@ mkdir -p "$FONTS_DIR"
 CASCADIA_VERSION="2404.23"
 CASCADIA_URL="https://github.com/microsoft/cascadia-code/releases/download/v${CASCADIA_VERSION}/CascadiaCode-${CASCADIA_VERSION}.zip"
 
-wget -O cascadia-temp.zip "$CASCADIA_URL"
+wget --quiet -O cascadia-temp.zip "$CASCADIA_URL"
 unzip -q cascadia-temp.zip -d cascadia-temp
 
 # Copy Regular (MVP), Bold and Italic (future)
