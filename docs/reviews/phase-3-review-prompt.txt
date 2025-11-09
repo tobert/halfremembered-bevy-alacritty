@@ -1,0 +1,122 @@
+You are reviewing Phase 3 of a Bevy 0.17 terminal emulation plugin implementation.
+
+## Phase 3: Terminal Grid to Texture Rendering
+
+**Context:**
+- Phase 1 (complete): PTY spawning, terminal state, keyboard input
+- Phase 2 (complete): Font loading (Cascadia Mono), glyph atlas (4096×4096, 255 chars)
+- Phase 3 (current): Render terminal grid to Image texture in real-time
+
+**Goal:** Review the render-to-texture implementation for correctness, performance, and potential issues.
+
+## Files to Review
+
+**Primary implementation:**
+- bevy-terminal/src/renderer.rs (273 lines) - Core rendering system
+- bevy-terminal/src/colors.rs (additions) - Tokyo Night color constants
+- bevy-terminal/src/terminal.rs (additions) - Plugin integration
+- examples/claude_crt/src/main.rs (additions) - Terminal display example
+
+## Key Implementation Details
+
+**TerminalTexture Resource:**
+- 1080×570 pixel RGBA texture (120 cols × 30 rows @ 9×19px per cell)
+- Created at startup after font/atlas initialization
+- Filled with Tokyo Night background color (#1a1b26)
+- RenderAssetUsages: MAIN_WORLD | RENDER_WORLD
+
+**render_terminal_to_texture System:**
+- Runs every frame in Update schedule
+- Reads alacritty_terminal::Term grid (120×30 cells)
+- For each cell:
+  1. Get character from grid[line][column]
+  2. Skip if space character (optimization)
+  3. Lookup UV coordinates from glyph atlas HashMap
+  4. Get foreground/background colors from cell
+  5. Blit glyph from atlas to texture with alpha compositing
+
+**Color Conversion:**
+- Handles NamedColor (16 ANSI colors with Tokyo Night palette)
+- Handles Spec RGB (24-bit true color)
+- Handles Indexed (256-color palette, basic 8-color mapping in MVP)
+- Default: fg=#c0caf5, bg=#1a1b26
+
+**Glyph Blitting Algorithm:**
+- Copies 9×19 pixels from atlas to destination
+- Alpha blending: `fg_color × alpha + bg_color × (1 - alpha)`
+- Three fast paths:
+  - alpha == 0: Pure background (no blend)
+  - alpha == 255: Pure foreground (no blend)
+  - 0 < alpha < 255: Full blend calculation
+- Proper bounds checking on array access
+
+## Review Focus Areas
+
+1. **Correctness:**
+   - Grid indexing (Line/Column usage)
+   - UV coordinate calculations
+   - Color conversion accuracy
+   - Alpha blending math
+
+2. **Performance:**
+   - Every-frame full redraw (no dirty tracking)
+   - Space character optimization
+   - Blit loop efficiency (171 pixels × ~1000 chars)
+   - Potential for optimization
+
+3. **Safety:**
+   - Bounds checking in blit_glyph
+   - Image data access (Option<Vec<u8>>)
+   - Potential panics or errors
+
+4. **MVP Scope:**
+   - Missing features that should be noted
+   - Technical debt to address later
+   - Limitations to document
+
+5. **Integration:**
+   - System ordering (Startup, Update)
+   - Resource dependencies
+   - Example usage correctness
+
+## Questions to Answer
+
+1. Is the rendering implementation correct and complete for MVP?
+2. Are there any bugs, edge cases, or potential crashes?
+3. Is the performance acceptable for 60 FPS rendering?
+4. Are there obvious optimizations that should be implemented now vs later?
+5. Is the color handling accurate and complete?
+6. Are there any unsafe patterns or code smells?
+7. Is the code well-structured and maintainable?
+
+## MVP Limitations (Known, Document Others)
+
+- No dirty region tracking (full redraw every frame)
+- Basic 256-color palette (only 8 colors mapped)
+- No cursor rendering
+- No bold/italic/underline attributes
+- Background colors applied per-glyph only
+- No scroll regions or alternate screen buffer
+
+## Output Format
+
+Please provide:
+
+1. **Overall Assessment:** Is this implementation solid for MVP? Major concerns?
+
+2. **Correctness Issues:** Any bugs or logical errors found?
+
+3. **Performance Analysis:** Is the every-frame redraw acceptable? Optimization suggestions?
+
+4. **Code Quality:** Structure, clarity, maintainability assessment
+
+5. **Specific Feedback:** Line-by-line issues if found (file:line format)
+
+6. **Recommendations:**
+   - Must-fix before proceeding: [list]
+   - Should-fix soon: [list]
+   - Nice-to-have improvements: [list]
+
+7. **Missing Functionality:** Features that should be noted as limitations
+
+Thank you for the thorough review!

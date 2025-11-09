@@ -34,6 +34,7 @@ fn main() {
         .add_systems(
             Update,
             (
+                spawn_terminal_view,
                 spawn_atlas_debug_view,
                 toggle_debug_view,
                 toggle_terminal_size,
@@ -52,15 +53,18 @@ struct HelpText;
 #[derive(Component)]
 struct AtlasDebugView;
 
+#[derive(Component)]
+struct TerminalSprite;
+
 #[derive(Resource)]
 struct DebugState {
     atlas_spawned: bool,
     debug_visible: bool,
+    terminal_spawned: bool,
 }
 
 fn setup(
     mut commands: Commands,
-    // terminal_texture: Res<TerminalTexture>, // TODO: Uncomment when ready
 ) {
     // Camera
     commands.spawn(Camera2d);
@@ -68,18 +72,21 @@ fn setup(
     // Initialize debug state
     commands.insert_resource(DebugState {
         atlas_spawned: false,
-        debug_visible: true,
+        debug_visible: false, // Start with debug off
+        terminal_spawned: false,
     });
 
-    // TODO: Spawn Claude character with CRT head
-    // For now, just placeholder
     info!("🎮 Claude CRT example ready");
-    info!("📺 Press 'T' to toggle terminal size (not implemented yet)");
+    info!("📺 Terminal will appear when ready");
     info!("🐛 Press 'D' to toggle debug atlas view");
 
     // Help text
     commands.spawn((
-        Text::new("Press 'D' to toggle debug atlas view\nPress 'T' to toggle terminal (WIP)"),
+        Text::new(
+            "Terminal Loading...\n\n\
+             Press 'D' to toggle debug atlas view\n\
+             Type in the terminal to see output!"
+        ),
         Node {
             position_type: PositionType::Absolute,
             top: Val::Px(10.0),
@@ -99,6 +106,48 @@ fn toggle_terminal_size(keyboard: Res<ButtonInput<KeyCode>>) {
 
 fn update_help_text() {
     // TODO: Update help text based on state
+}
+
+/// Spawn terminal view once the terminal texture is ready.
+///
+/// Creates a centered sprite showing the live terminal output.
+fn spawn_terminal_view(
+    terminal_texture: Option<Res<TerminalTexture>>,
+    mut debug_state: ResMut<DebugState>,
+    mut commands: Commands,
+) {
+    // Only spawn once when resource is available
+    if debug_state.terminal_spawned {
+        return;
+    }
+
+    let Some(terminal_texture) = terminal_texture else {
+        return;
+    };
+
+    info!("📺 Spawning terminal view");
+
+    // Calculate scale to fit terminal on screen comfortably
+    let window_height = 1080.0;
+    let scale = (window_height * 0.8) / terminal_texture.height as f32;
+
+    info!(
+        "📐 Terminal texture: {}×{} pixels, scale={:.2}",
+        terminal_texture.width, terminal_texture.height, scale
+    );
+
+    // Spawn sprite showing terminal
+    commands.spawn((
+        Sprite {
+            image: terminal_texture.handle.clone(),
+            ..default()
+        },
+        Transform::from_xyz(0.0, 0.0, 1.0).with_scale(Vec3::splat(scale)),
+        TerminalSprite,
+    ));
+
+    debug_state.terminal_spawned = true;
+    info!("✅ Terminal view spawned - you can now type in the terminal!");
 }
 
 /// Spawn atlas debug view once the atlas is ready.

@@ -12,6 +12,7 @@ use crate::atlas::GlyphAtlas;
 use crate::font::FontMetrics;
 use crate::input;
 use crate::pty;
+use crate::renderer;
 
 /// Simple dimensions struct for MVP (hardcoded 120×30).
 struct TerminalDimensions {
@@ -130,12 +131,9 @@ impl Plugin for TerminalPlugin {
             ))
             // Phase 2: Font and Atlas
             .add_systems(Startup, initialize_font_and_atlas)
-            // TODO: Add remaining resources
-            // .init_resource::<TerminalTexture>()
-            // TODO: Add remaining systems
-            // .add_systems(Update, (
-            //     render_to_texture,
-            // ))
+            // Phase 3: Render to Texture
+            .add_systems(Startup, renderer::initialize_terminal_texture.after(initialize_font_and_atlas))
+            .add_systems(Update, renderer::render_terminal_to_texture)
             // TODO: Add events
             // .add_event::<TerminalEvent>()
             ;

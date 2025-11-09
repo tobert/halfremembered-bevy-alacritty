@@ -1,0 +1,52 @@
+# HalfRemembered Bevy Alacritty Terminal Plugin
+#
+# Bevy 0.17 plugin for embedding terminal emulation in games.
+# Uses render-to-texture architecture for flexible display.
+#
+# Build and run:
+#   cargo build --release --example claude_crt
+#   halfremembered-launcher config-sync --server your-server
+#
+# On Windows/WSL client:
+#   ~/bin/claude_crt.exe
+
+[project]
+name = "bevy-terminal"
+description = "Bevy terminal emulation plugin with render-to-texture CRT demo"
+
+# Linux example binary - for native Linux or WSL
+[[sync]]
+name = "linux-example"
+include = ["target/release/claude_crt"]
+destination = "~/bin/"
+clients = ["*"]  # All clients (WSL can run Linux binaries)
+
+# Windows example binary - for Windows or WSL → Windows
+[[sync]]
+name = "windows-example"
+include = ["target/x86_64-pc-windows-gnu/release/claude_crt.exe"]
+destination = "~/bin/"
+clients = ["*"]  # WSL can launch .exe into Windows
+
+# Documentation for reference
+[[sync]]
+name = "docs"
+include = [
+    "README.md",
+    "CLAUDE.md",
+    "BOTS.md",
+    "docs/**/*.md",
+]
+destination = "~/bevy-terminal-docs/"
+
+# Font assets (included in binary via include_bytes!, but useful for reference)
+[[sync]]
+name = "fonts"
+include = ["bevy-terminal/assets/fonts/*.ttf"]
+destination = "~/bevy-terminal-assets/fonts/"
+
+# Quick reference guide
+[[sync]]
+name = "quickstart"
+include = ["docs/continuation-prompt.md"]
+destination = "~/bevy-terminal-quickstart.md"
