@@ -3,9 +3,10 @@
 //! Loads Cascadia Mono and calculates cell dimensions for terminal rendering.
 //! Uses ab_glyph for font parsing and rasterization.
 
-use ab_glyph::{Font, FontArc, PxScale, ScaleFont};
 use anyhow::{Context, Result};
+use ab_glyph::{Font, FontVec, PxScale, ScaleFont};
 use bevy::prelude::*;
+use log::info;
 
 /// Font size in points for terminal text (MVP: hardcoded 14pt).
 pub const FONT_SIZE: f32 = 14.0;
@@ -15,10 +16,10 @@ pub const FONT_SIZE: f32 = 14.0;
 /// This resource holds the parsed font and calculated dimensions for
 /// terminal cell rendering. All glyphs render to the same cell size
 /// for proper terminal grid alignment.
-#[derive(Resource, Clone)]
+#[derive(Resource)]
 pub struct FontMetrics {
     /// Parsed font (Cascadia Mono)
-    pub font: FontArc,
+    pub font: FontVec,
     /// Width of each terminal cell in pixels
     pub cell_width: f32,
     /// Height of each terminal cell in pixels
@@ -43,7 +44,7 @@ impl FontMetrics {
     /// Loaded font with calculated cell dimensions
     pub fn load(font_bytes: &[u8], font_size: f32) -> Result<Self> {
         // Parse font with ab_glyph (must own the data, so convert to Vec)
-        let font = FontArc::try_from_vec(font_bytes.to_vec())
+        let font = FontVec::try_from_vec(font_bytes.to_vec())
             .context("Failed to parse font file - invalid TTF/OTF format")?;
 
         let scale = PxScale::from(font_size);

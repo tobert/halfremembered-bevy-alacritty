@@ -28,17 +28,18 @@ pub mod atlas;
 mod colors;
 mod events;
 pub mod font;
-mod input;
-mod pty;
-mod renderer;
+pub mod input;
+pub mod pty;
+pub mod renderer;
 mod terminal;
 
 pub use renderer::TerminalTexture;
-pub use terminal::TerminalPlugin;
+pub use terminal::{TerminalPlugin, TerminalState};
 
 /// Re-export commonly used types
 pub mod prelude {
     pub use crate::events::TerminalEvent;
+    pub use crate::input::TerminalInputEnabled;
     pub use crate::renderer::TerminalTexture;
     pub use crate::terminal::TerminalPlugin;
 }

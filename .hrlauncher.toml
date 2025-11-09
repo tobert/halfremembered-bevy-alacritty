@@ -4,11 +4,14 @@
 # Uses render-to-texture architecture for flexible display.
 #
 # Build and run:
-#   cargo build --release --example claude_crt
+#   cargo build --release                # Linux binary
+#   cargo build-windows                  # Windows MSVC binary (via xwin)
+#   cargo build-all                      # Both platforms
 #   halfremembered-launcher config-sync --server your-server
 #
 # On Windows/WSL client:
-#   ~/bin/claude_crt.exe
+#   ~/bin/claude_crt       # Linux (WSL)
+#   ~/bin/claude_crt.exe   # Windows
 
 [project]
 name = "bevy-terminal"
@@ -18,35 +21,14 @@ description = "Bevy terminal emulation plugin with render-to-texture CRT demo"
 [[sync]]
 name = "linux-example"
 include = ["target/release/claude_crt"]
+exclude = ["**/*.d", "**/*.rcgu.o", "**/*.dwo", "**/.fingerprint/**"]
 destination = "~/bin/"
 clients = ["*"]  # All clients (WSL can run Linux binaries)
 
 # Windows example binary - for Windows or WSL → Windows
 [[sync]]
 name = "windows-example"
-include = ["target/x86_64-pc-windows-gnu/release/claude_crt.exe"]
+include = ["target/x86_64-pc-windows-msvc/release/claude_crt.exe"]
+exclude = ["**/*.d", "**/*.rcgu.o", "**/*.dwo", "**/.fingerprint/**"]
 destination = "~/bin/"
 clients = ["*"]  # WSL can launch .exe into Windows
-
-# Documentation for reference
-[[sync]]
-name = "docs"
-include = [
-    "README.md",
-    "CLAUDE.md",
-    "BOTS.md",
-    "docs/**/*.md",
-]
-destination = "~/bevy-terminal-docs/"
-
-# Font assets (included in binary via include_bytes!, but useful for reference)
-[[sync]]
-name = "fonts"
-include = ["bevy-terminal/assets/fonts/*.ttf"]
-destination = "~/bevy-terminal-assets/fonts/"
-
-# Quick reference guide
-[[sync]]
-name = "quickstart"
-include = ["docs/continuation-prompt.md"]
-destination = "~/bevy-terminal-quickstart.md"

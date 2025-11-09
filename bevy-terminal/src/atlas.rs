@@ -7,6 +7,7 @@ use ab_glyph::{point, Font, Glyph, ScaleFont};
 use anyhow::{Context, Result};
 use bevy::prelude::*;
 use std::collections::HashMap;
+use log::info;
 
 use crate::font::FontMetrics;
 
@@ -216,13 +217,33 @@ fn rasterize_glyph<F: Font>(
     let horizontal_offset = ((cell_width as f32 - glyph_width) / 2.0).max(0.0);
 
     // Position glyph on baseline
-    let vertical_offset = baseline - bounds.min.y;
+    // We want glyph-space y=0 (which is the baseline for `ab_glyph` when position is `point(0.0,0.0)`) to map to cell-space y=baseline.
+    // `outlined.draw` provides `glyph_y` relative to `outlined.px_bounds().min.y`.
+    // So, `pixel_y_in_cell = baseline + (outlined.px_bounds().min.y + glyph_y_from_draw)`
+    let vertical_offset_correction = baseline + bounds.min.y;
+    
+    if character == 'A' {
+        println!("Debug 'A': bounds={:?}, baseline={}, h_off={}, v_off={}", 
+            bounds, baseline, horizontal_offset, vertical_offset_correction);
+    }
+
+    // Debug stats for 'A'
+    let mut debug_pixels = 0;
+    let mut debug_opaque = 0;
+    let is_debug_char = character == 'A';
 
     // Rasterize glyph
     outlined.draw(|glyph_x, glyph_y, coverage| {
+        if is_debug_char {
+            debug_pixels += 1;
+            if coverage > 0.9 {
+                debug_opaque += 1;
+            }
+        }
+
         // Calculate pixel position in cell
         let pixel_x = horizontal_offset + glyph_x as f32;
-        let pixel_y = vertical_offset + glyph_y as f32;
+        let pixel_y = vertical_offset_correction + glyph_y as f32;
 
         // Convert to atlas coordinates
         let atlas_x = cell_x as f32 + pixel_x;

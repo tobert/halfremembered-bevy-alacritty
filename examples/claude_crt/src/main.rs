@@ -37,7 +37,8 @@ fn main() {
                 spawn_terminal_view,
                 spawn_atlas_debug_view,
                 toggle_debug_view,
-                toggle_terminal_size,
+                handle_zoom_input,
+                animate_zoom_transition,
                 update_help_text,
             ),
         )
@@ -55,6 +56,33 @@ struct AtlasDebugView;
 
 #[derive(Component)]
 struct TerminalSprite;
+
+/// Current zoom state of the terminal
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ZoomState {
+    Tiny,       // 0.05 scale - tiny CRT on character
+    Fullscreen, // 1.0 scale - zoomed in for interaction
+}
+
+/// Terminal interaction state
+#[derive(Resource)]
+struct TerminalState {
+    zoom: ZoomState,
+    target_scale: f32,
+    current_scale: f32,
+    transition_speed: f32,
+}
+
+impl Default for TerminalState {
+    fn default() -> Self {
+        Self {
+            zoom: ZoomState::Tiny,
+            target_scale: 0.05,
+            current_scale: 0.05,
+            transition_speed: 8.0, // Smooth but responsive
+        }
+    }
+}
 
 #[derive(Resource)]
 struct DebugState {
@@ -76,16 +104,24 @@ fn setup(
         terminal_spawned: false,
     });
 
+    // Initialize terminal interaction state
+    commands.insert_resource(TerminalState::default());
+
+    // Disable terminal input initially (enabled when zoomed in)
+    commands.insert_resource(TerminalInputEnabled { enabled: false });
+
     info!("🎮 Claude CRT example ready");
-    info!("📺 Terminal will appear when ready");
+    info!("📺 Terminal will appear when ready (tiny CRT)");
+    info!("⌨️  Press 'E' near terminal to zoom in");
     info!("🐛 Press 'D' to toggle debug atlas view");
 
     // Help text
     commands.spawn((
         Text::new(
             "Terminal Loading...\n\n\
-             Press 'D' to toggle debug atlas view\n\
-             Type in the terminal to see output!"
+             Press 'E' to zoom in\n\
+             Press 'ESC' to zoom out\n\
+             Press 'D' to toggle debug atlas view"
         ),
         Node {
             position_type: PositionType::Absolute,
@@ -97,22 +133,80 @@ fn setup(
     ));
 }
 
-fn toggle_terminal_size(keyboard: Res<ButtonInput<KeyCode>>) {
-    if keyboard.just_pressed(KeyCode::KeyT) {
-        info!("Terminal toggle requested (not implemented)");
-        // TODO: Toggle between tiny (0.05) and fullscreen (1.0)
+/// Handle zoom input (E to zoom in, ESC to zoom out).
+fn handle_zoom_input(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut terminal_state: ResMut<TerminalState>,
+    mut input_enabled: ResMut<TerminalInputEnabled>,
+) {
+    if keyboard.just_pressed(KeyCode::KeyE) && terminal_state.zoom == ZoomState::Tiny {
+        info!("🔍 Zooming in to fullscreen");
+        terminal_state.zoom = ZoomState::Fullscreen;
+        terminal_state.target_scale = 1.0;
+        input_enabled.enabled = true; // Enable terminal input when zoomed in
+    }
+
+    if keyboard.just_pressed(KeyCode::Escape) && terminal_state.zoom == ZoomState::Fullscreen {
+        info!("🔍 Zooming out to tiny");
+        terminal_state.zoom = ZoomState::Tiny;
+        terminal_state.target_scale = 0.05;
+        input_enabled.enabled = false; // Disable terminal input when zoomed out
     }
 }
 
-fn update_help_text() {
-    // TODO: Update help text based on state
+/// Animate smooth zoom transitions.
+fn animate_zoom_transition(
+    time: Res<Time>,
+    mut terminal_state: ResMut<TerminalState>,
+    mut query: Query<&mut Transform, With<TerminalSprite>>,
+) {
+    // Lerp current scale toward target
+    let delta = terminal_state.target_scale - terminal_state.current_scale;
+    if delta.abs() > 0.001 {
+        terminal_state.current_scale += delta * terminal_state.transition_speed * time.delta_secs();
+
+        // Update sprite transform
+        for mut transform in query.iter_mut() {
+            transform.scale = Vec3::splat(terminal_state.current_scale);
+        }
+    }
+}
+
+/// Update help text based on current state.
+fn update_help_text(
+    terminal_state: Res<TerminalState>,
+    mut query: Query<&mut Text, With<HelpText>>,
+) {
+    if !terminal_state.is_changed() {
+        return;
+    }
+
+    for mut text in query.iter_mut() {
+        **text = match terminal_state.zoom {
+            ZoomState::Tiny => {
+                "Tiny CRT Mode\n\n\
+                 Press 'E' to zoom in\n\
+                 Press 'D' to toggle debug atlas view"
+                    .to_string()
+            }
+            ZoomState::Fullscreen => {
+                "Fullscreen Terminal Mode\n\n\
+                 Type commands here!\n\
+                 Press 'ESC' to zoom out\n\
+                 Press 'D' to toggle debug atlas view"
+                    .to_string()
+            }
+        };
+    }
 }
 
 /// Spawn terminal view once the terminal texture is ready.
 ///
-/// Creates a centered sprite showing the live terminal output.
+/// Creates a tiny sprite showing the live terminal output (0.05 scale).
+/// Use E key to zoom to fullscreen.
 fn spawn_terminal_view(
     terminal_texture: Option<Res<TerminalTexture>>,
+    terminal_state: Res<TerminalState>,
     mut debug_state: ResMut<DebugState>,
     mut commands: Commands,
 ) {
@@ -125,18 +219,16 @@ fn spawn_terminal_view(
         return;
     };
 
-    info!("📺 Spawning terminal view");
+    info!("📺 Spawning tiny CRT terminal");
 
-    // Calculate scale to fit terminal on screen comfortably
-    let window_height = 1080.0;
-    let scale = (window_height * 0.8) / terminal_texture.height as f32;
+    let scale = terminal_state.current_scale;
 
     info!(
-        "📐 Terminal texture: {}×{} pixels, scale={:.2}",
+        "📐 Terminal texture: {}×{} pixels, tiny scale={:.3}",
         terminal_texture.width, terminal_texture.height, scale
     );
 
-    // Spawn sprite showing terminal
+    // Spawn tiny sprite showing terminal (CRT on character's head)
     commands.spawn((
         Sprite {
             image: terminal_texture.handle.clone(),
@@ -147,7 +239,7 @@ fn spawn_terminal_view(
     ));
 
     debug_state.terminal_spawned = true;
-    info!("✅ Terminal view spawned - you can now type in the terminal!");
+    info!("✅ Tiny CRT terminal spawned - press 'E' to zoom in!");
 }
 
 /// Spawn atlas debug view once the atlas is ready.

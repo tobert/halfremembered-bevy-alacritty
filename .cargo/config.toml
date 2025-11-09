@@ -5,6 +5,15 @@
 linker = "clang"
 rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 
+# Windows MSVC cross-compilation via xwin
+[target.x86_64-pc-windows-msvc]
+linker = "lld-link"
+rustflags = [
+    "-Lnative=/home/atobey/.xwin/crt/lib/x86_64",
+    "-Lnative=/home/atobey/.xwin/sdk/lib/um/x86_64",
+    "-Lnative=/home/atobey/.xwin/sdk/lib/ucrt/x86_64"
+]
+
 # Optimize dev builds
 [profile.dev]
 split-debuginfo = "unpacked"
@@ -12,3 +21,5 @@ split-debuginfo = "unpacked"
 [alias]
 ex = "run --example"
 check-all = "clippy --all-targets -- -D warnings"
+build-windows = "xwin build --release --target x86_64-pc-windows-msvc"
+build-all = "build --release && cargo xwin build --release --target x86_64-pc-windows-msvc"

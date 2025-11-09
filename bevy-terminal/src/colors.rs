@@ -5,7 +5,7 @@
 use bevy::prelude::*;
 
 /// Tokyo Night background color as RGB bytes.
-pub const TOKYO_NIGHT_BG: [u8; 3] = [0x1a, 0x1b, 0x26];
+pub const TOKYO_NIGHT_BG: [u8; 3] = [0x1a, 0x1b, 0x26]; // #1a1b26
 
 /// Tokyo Night color scheme (hardcoded for MVP)
 #[derive(Debug, Clone)]

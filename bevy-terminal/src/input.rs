@@ -9,8 +9,18 @@
 
 use bevy::prelude::*;
 use std::io::Write;
+use log::{error, trace};
 
 use crate::pty::PtyResource;
+
+/// Controls whether keyboard input is routed to the terminal.
+///
+/// When false, keyboard events are ignored by the terminal.
+/// Use this to implement game-specific input modes (e.g., zoom controls).
+#[derive(Resource, Default)]
+pub struct TerminalInputEnabled {
+    pub enabled: bool,
+}
 
 /// Handles keyboard input and sends it to the PTY.
 ///
@@ -18,10 +28,17 @@ use crate::pty::PtyResource;
 /// Runs: Every frame
 ///
 /// Supports Shift and Ctrl modifiers for proper terminal interaction.
+/// Respects TerminalInputEnabled resource to allow game-specific input modes.
 pub fn handle_keyboard_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     pty: Res<PtyResource>,
+    input_enabled: Option<Res<TerminalInputEnabled>>,
 ) {
+    // Check if terminal input is enabled (defaults to true if resource not present)
+    let enabled = input_enabled.map(|r| r.enabled).unwrap_or(true);
+    if !enabled {
+        return;
+    }
     // Check modifier state
     let shift = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
     let ctrl = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);

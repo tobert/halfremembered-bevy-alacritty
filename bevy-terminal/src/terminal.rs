@@ -2,11 +2,13 @@
 
 use alacritty_terminal::event::{Event as AlacEvent, EventListener};
 use alacritty_terminal::grid::Dimensions;
+use alacritty_terminal::index::{Column, Line};
 use alacritty_terminal::sync::FairMutex;
 use alacritty_terminal::term::{Config as AlacConfig, Term};
 use alacritty_terminal::vte::ansi::Processor;
 use bevy::prelude::*;
 use std::sync::Arc;
+use log::info;
 
 use crate::atlas::GlyphAtlas;
 use crate::font::FontMetrics;
@@ -93,6 +95,54 @@ impl TerminalState {
     pub fn process_bytes(&mut self, bytes: &[u8]) {
         let mut term = self.term.lock();
         self.processor.advance(&mut *term, bytes);
+    }
+
+    /// Extract visible text from terminal grid for testing/debugging.
+    ///
+    /// Returns a String containing all visible characters in the terminal,
+    /// with newlines separating rows. Useful for verifying VTE parsing.
+    pub fn get_visible_text(&self) -> String {
+        let term = self.term.lock();
+        let mut result = String::new();
+
+        for row in 0..self.rows {
+            for col in 0..self.cols {
+                let line = Line::from(row as i32);
+                let column = Column(col);
+                let cell = &term.grid()[line][column];
+
+                // Get the character from the cell
+                let c = cell.c;
+                if c != ' ' && c != '\0' {
+                    result.push(c);
+                } else {
+                    result.push(' ');
+                }
+            }
+            result.push('\n');
+        }
+
+        result
+    }
+
+    /// Get a compact summary of non-empty lines for debugging.
+    ///
+    /// Returns only lines that contain non-whitespace characters,
+    /// with line numbers. Useful for quick inspection in tests.
+    pub fn get_content_summary(&self) -> Vec<(usize, String)> {
+        let full_text = self.get_visible_text();
+        full_text
+            .lines()
+            .enumerate()
+            .filter_map(|(idx, line)| {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    Some((idx, trimmed.to_string()))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 

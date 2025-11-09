@@ -7,6 +7,7 @@ use alacritty_terminal::index::{Column, Line};
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use log::{info, error, warn};
 
 use crate::atlas::GlyphAtlas;
 use crate::colors::TOKYO_NIGHT_BG;
@@ -91,11 +92,12 @@ pub fn render_terminal_to_texture(
     mut images: ResMut<Assets<Image>>,
 ) {
     let Some(image) = images.get_mut(&terminal_texture.handle) else {
+        error!("🚨 Renderer: Failed to get terminal texture image!");
         return;
     };
 
     let Some(ref mut image_data) = image.data else {
-        error!("Terminal texture has no data");
+        error!("🚨 Renderer: Terminal texture has no data");
         return;
     };
 
@@ -111,6 +113,11 @@ pub fn render_terminal_to_texture(
         pixel[3] = 255;
     }
 
+    // Track rendering stats
+    let mut chars_rendered = 0;
+    let mut chars_skipped_space = 0;
+    let mut chars_missing_glyph = 0;
+
     // Render each cell
     for row in 0..term_state.rows {
         for col in 0..term_state.cols {
@@ -123,15 +130,22 @@ pub fn render_terminal_to_texture(
             let character = cell.c;
 
             // Skip rendering for space characters (background already cleared)
-            if character == ' ' {
+            if character == ' ' || character == '\0' {
+                chars_skipped_space += 1;
                 continue;
             }
 
             // Get glyph UV from atlas
             let Some(uv) = atlas.get_uv(character) else {
                 // Character not in atlas, skip it
+                if chars_missing_glyph == 0 {
+                    warn!("⚠️  Renderer: Character '{}' (U+{:04X}) not in atlas", character, character as u32);
+                }
+                chars_missing_glyph += 1;
                 continue;
             };
+
+            chars_rendered += 1;
 
             // Get colors from cell
             let fg_color = convert_alacritty_color(cell.fg);
@@ -157,6 +171,22 @@ pub fn render_terminal_to_texture(
                 bg_color,
             );
         }
+    }
+
+    // Log rendering stats (always log in tests to help debugging)
+    #[cfg(test)]
+    println!(
+        "🎨 Renderer: {} chars rendered, {} spaces skipped, {} missing glyphs",
+        chars_rendered, chars_skipped_space, chars_missing_glyph
+    );
+
+    // Log in production only when there's interesting activity
+    #[cfg(not(test))]
+    if chars_rendered > 0 || chars_missing_glyph > 0 {
+        info!(
+            "🎨 Renderer: {} chars rendered, {} spaces skipped, {} missing glyphs",
+            chars_rendered, chars_skipped_space, chars_missing_glyph
+        );
     }
 }
 
@@ -233,6 +263,7 @@ fn blit_glyph(
     let atlas_src_y = (uv.min.y * atlas_height as f32) as u32; // Fixed per Gemini review
 
     // Blit each pixel
+    let mut bounds_failures = 0;
     for y in 0..cell_height {
         for x in 0..cell_width {
             let atlas_pixel_x = atlas_src_x + x;
@@ -249,6 +280,13 @@ fn blit_glyph(
 
             // Bounds check
             if atlas_idx + 3 >= atlas_data.len() || dest_idx + 3 >= dest_data.len() {
+                if bounds_failures == 0 {
+                    error!(
+                        "🚨 Blit bounds error: atlas_idx={}, atlas_len={}, dest_idx={}, dest_len={}",
+                        atlas_idx, atlas_data.len(), dest_idx, dest_data.len()
+                    );
+                }
+                bounds_failures += 1;
                 continue;
             }
 

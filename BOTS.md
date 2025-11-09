@@ -86,7 +86,25 @@ jj git push -c @
 gh pr create --fill
 ```
 
-## 3. Technical Guidelines
+## 3. Operational Safety: Shell Quoting & Markdown
+
+**CRITICAL:** When using tools like `jj describe` or `git commit`, remember you are piping text through `bash`.
+
+### The Trap: Markdown in Double Quotes
+Markdown backticks inside double quotes trigger shell command execution.
+- ❌ `jj describe -m "Refactored `PtyResource`"`
+  - **Result:** The shell tries to execute the command `PtyResource` and fails, or worse, executes something unexpected.
+
+### The Fix: Use Single Quotes
+Always prefer **single quotes** for descriptions or messages containing code or technical terms.
+- ✅ `jj describe -m 'Refactored `PtyResource`'`
+  - **Result:** The shell treats the string literally.
+
+### Alternative: Escape Rigorously
+If you must use double quotes (e.g., for shell variable expansion), you must escape backticks and dollar signs.
+- ✅ `jj describe -m "Refactored \`PtyResource\`"`
+
+## 4. Technical Guidelines
 
 ### Code Style & Quality
 - **Correctness & Clarity First**: Prioritize readable, correct code over premature optimization.
@@ -142,7 +160,7 @@ Co-authored-by: <Your Name> <your@email>
 - **Gemini**: `Co-authored-by: Gemini <gemini@google.com>`
 - **Kimi**: `Co-authored-by: Kimi <kimi@moonshot.ai>`
 
-## 4. GitHub Integration
+## 5. GitHub Integration
 
 **GitHub CLI (`gh`):**
 Use `gh` for GitHub operations without leaving the terminal:
@@ -156,7 +174,7 @@ gh issue view <number>       # Read issue details
 
 The `--fill` flag pulls title and body from your jj description - another reason to keep descriptions rich and clear.
 
-## 5. Cross-Session Context Patterns
+## 6. Cross-Session Context Patterns
 
 jj's power is in context preservation across sessions and agents.
 
