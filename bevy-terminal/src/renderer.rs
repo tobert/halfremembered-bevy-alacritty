@@ -146,6 +146,7 @@ pub fn render_terminal_to_texture(
                 image_data,
                 &atlas.texture_data,
                 atlas.atlas_width,
+                atlas.atlas_height,
                 terminal_texture.width,
                 dest_x as u32,
                 dest_y as u32,
@@ -217,6 +218,7 @@ fn blit_glyph(
     dest_data: &mut [u8],
     atlas_data: &[u8],
     atlas_width: u32,
+    atlas_height: u32,
     dest_width: u32,
     dest_x: u32,
     dest_y: u32,
@@ -228,7 +230,7 @@ fn blit_glyph(
 ) {
     // Calculate atlas source rectangle in pixels
     let atlas_src_x = (uv.min.x * atlas_width as f32) as u32;
-    let atlas_src_y = (uv.min.y * atlas_width as f32) as u32;
+    let atlas_src_y = (uv.min.y * atlas_height as f32) as u32; // Fixed per Gemini review
 
     // Blit each pixel
     for y in 0..cell_height {
