@@ -5,7 +5,7 @@
 
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
 use log::info;
 
 use crate::atlas::GlyphAtlas;
@@ -54,7 +54,7 @@ pub fn initialize_terminal_texture(
         pixel[3] = 255;
     }
 
-    let image = Image::new(
+    let mut image = Image::new(
         Extent3d {
             width,
             height,
@@ -62,9 +62,10 @@ pub fn initialize_terminal_texture(
         },
         TextureDimension::D2,
         texture_data,
-        TextureFormat::Rgba8Unorm, // Storage binding requires non-SRGB usually
+        TextureFormat::Rgba8Unorm,
         RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
     );
+    image.texture_descriptor.usage = TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST | TextureUsages::STORAGE_BINDING;
 
     let handle = images.add(image);
 
