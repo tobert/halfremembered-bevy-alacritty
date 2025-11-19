@@ -28,8 +28,8 @@ pub fn prepare_terminal_cpu_buffer(
     // Resize buffer if needed
     let total_cells = rows * cols;
     if cpu_buffer.cells.len() != total_cells {
-        info!("Initializing CPU buffer with {} cells", total_cells);
         let bg_packed = pack_color(TOKYO_NIGHT_BG);
+        info!("Initializing CPU buffer with {} cells. Default BG: {:X}", total_cells, bg_packed);
         cpu_buffer.cells.resize(total_cells, GpuTerminalCell {
             glyph_index: 0,
             fg_color: 0,
@@ -72,8 +72,12 @@ pub fn prepare_terminal_cpu_buffer(
     
     // Log first frame or periodically?
     // Let's log if the first cell is unexpectedly zero
-    if updates > 0 && cpu_buffer.cells[0].bg_color == 0 {
-        info!("⚠️  GPU Prep: Cell 0 has 0 background color! Row/Cols: {}/{}", rows, cols);
+    if updates > 0 {
+        if cpu_buffer.cells[0].bg_color == 0 {
+            info!("⚠️  GPU Prep: Cell 0 has 0 background color! Row/Cols: {}/{}", rows, cols);
+        } else {
+             // info!("GPU Prep: Cell 0 BG: {:X}", cpu_buffer.cells[0].bg_color);
+        }
     }
 }
 
