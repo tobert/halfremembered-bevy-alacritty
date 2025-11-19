@@ -4,7 +4,6 @@ use crate::terminal::TerminalState;
 use crate::atlas::GlyphAtlas;
 use crate::colors::{convert_alacritty_color, TOKYO_NIGHT_BG};
 use alacritty_terminal::index::{Column, Line};
-use log::info;
 
 /// Resource holding the CPU-side buffer of terminal cells.
 ///
@@ -20,14 +19,6 @@ pub fn prepare_terminal_cpu_buffer(
     atlas: Res<GlyphAtlas>,
     mut cpu_buffer: ResMut<TerminalCpuBuffer>,
 ) {
-    static mut CALL_COUNT: u32 = 0;
-    unsafe {
-        CALL_COUNT += 1;
-        if CALL_COUNT % 60 == 1 {
-            info!("🔄 prepare_terminal_cpu_buffer called {} times", CALL_COUNT);
-        }
-    }
-
     let term = term_state.term.lock();
     let grid = term.grid();
     let rows = term_state.rows;
@@ -78,17 +69,6 @@ pub fn prepare_terminal_cpu_buffer(
         }
     }
     
-    // Debug: Log what we're seeing in the grid
-    if updates > 0 {
-        let mut non_space_count = 0;
-        for cell in &cpu_buffer.cells {
-            if cell.glyph_index != 0 && cell.glyph_index != atlas.get_glyph_index(' ').unwrap_or(0) {
-                non_space_count += 1;
-            }
-        }
-        info!("🔍 GPU Prep: {} updates, {} non-space glyphs, cell[0] glyph={} bg={:X}",
-              updates, non_space_count, cpu_buffer.cells[0].glyph_index, cpu_buffer.cells[0].bg_color);
-    }
 }
 
 // Helper: Pack [u8; 3] rgb into u32 (0xFFBBGGRR for little endian / GPU)

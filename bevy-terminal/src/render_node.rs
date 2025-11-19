@@ -78,15 +78,6 @@ fn update_extraction_resource(
         let atlas_rows = atlas.atlas_height / atlas.cell_height;
 
         if let Some(atlas_handle) = &atlas.texture_handle {
-            // Debug: Log what we're extracting
-            static mut EXTRACT_COUNT: u32 = 0;
-            unsafe {
-                EXTRACT_COUNT += 1;
-                if EXTRACT_COUNT % 60 == 1 && !cpu_buffer.cells.is_empty() {
-                    info!("📤 Extracting: {} cells, cell[0] bg={:X}", cpu_buffer.cells.len(), cpu_buffer.cells[0].bg_color);
-                }
-            }
-
             commands.insert_resource(ExtractedTerminalData {
                 cells: cpu_buffer.cells.clone(),
                 texture_handle: texture.handle.clone(),
