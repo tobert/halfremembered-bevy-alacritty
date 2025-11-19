@@ -36,7 +36,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     
     // DEBUG: Force top-left corner to RED to verify shader is running
     if (pixel.x < 10 && pixel.y < 10) {
-        textureStore(output_texture, pixel, vec4<f32>(1.0, 0.0, 0.0, 1.0));
+        textureStore(output_texture, vec2<i32>(i32(pixel.x), i32(pixel.y)), vec4<f32>(1.0, 0.0, 0.0, 1.0));
         return;
     }
 
@@ -71,7 +71,8 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let atlas_y = atlas_row * uniforms.cell_height + intra_y;
 
     // Load glyph pixel (using 0 mip level)
-    let glyph_color = textureLoad(atlas_texture, vec2<u32>(atlas_x, atlas_y), 0);
+    // textureLoad requires i32 coordinates
+    let glyph_color = textureLoad(atlas_texture, vec2<i32>(i32(atlas_x), i32(atlas_y)), 0);
     let alpha = glyph_color.a; // Assuming alpha contains the shape
 
     // Blend colors
@@ -82,5 +83,5 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let final_color = mix(bg, fg, alpha);
 
     // Write to output
-    textureStore(output_texture, pixel, final_color);
+    textureStore(output_texture, vec2<i32>(i32(pixel.x), i32(pixel.y)), final_color);
 }
