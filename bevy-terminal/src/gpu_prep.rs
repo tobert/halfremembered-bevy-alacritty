@@ -2,8 +2,9 @@ use bevy::prelude::*;
 use crate::gpu_types::GpuTerminalCell;
 use crate::terminal::TerminalState;
 use crate::atlas::GlyphAtlas;
-use crate::colors::convert_alacritty_color;
+use crate::colors::{convert_alacritty_color, TOKYO_NIGHT_BG};
 use alacritty_terminal::index::{Column, Line};
+use log::info;
 
 /// Resource holding the CPU-side buffer of terminal cells.
 ///
@@ -27,38 +28,34 @@ pub fn prepare_terminal_cpu_buffer(
     // Resize buffer if needed
     let total_cells = rows * cols;
     if cpu_buffer.cells.len() != total_cells {
+        info!("Initializing CPU buffer with {} cells", total_cells);
+        let bg_packed = pack_color(TOKYO_NIGHT_BG);
         cpu_buffer.cells.resize(total_cells, GpuTerminalCell {
-            glyph_index: 0, // Default to 0 (usually space or null)
+            glyph_index: 0,
             fg_color: 0,
-            bg_color: 0,
+            bg_color: bg_packed, // Default to opaque blue
             flags: 0,
         });
     }
 
     // Fill buffer
+    let mut updates = 0;
     for row in 0..rows {
         for col in 0..cols {
             let line = Line(row as i32);
             let column = Column(col);
             let cell = &grid[line][column];
-
+            
             // Map char to atlas index
-            // If char is not in atlas, use index 0 (or a dedicated 'missing' glyph if we had one)
-            // Space (' ') is usually in atlas, null ('\0') might not be.
             let glyph_index = if cell.c == '\0' || cell.c == ' ' {
-                // Optimization: space is often index 0 or we can skip rendering it in shader?
-                // For now, let's try to find it, or default to something invisible.
-                // Actually, we should just draw space.
                  atlas.get_glyph_index(' ').unwrap_or(0)
             } else {
                 atlas.get_glyph_index(cell.c).unwrap_or_else(|| {
-                     // Fallback for missing glyphs
                      atlas.get_glyph_index('?').unwrap_or(0)
                 })
             };
 
             // Pack colors (RGBA u32)
-            // We need to convert Alacritty colors to u32.
             let fg = pack_color(convert_alacritty_color(cell.fg));
             let bg = pack_color(convert_alacritty_color(cell.bg));
 
@@ -69,7 +66,14 @@ pub fn prepare_terminal_cpu_buffer(
                 bg_color: bg,
                 flags: 0,
             };
+            updates += 1;
         }
+    }
+    
+    // Log first frame or periodically?
+    // Let's log if the first cell is unexpectedly zero
+    if updates > 0 && cpu_buffer.cells[0].bg_color == 0 {
+        info!("⚠️  GPU Prep: Cell 0 has 0 background color! Row/Cols: {}/{}", rows, cols);
     }
 }
 
