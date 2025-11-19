@@ -15,6 +15,7 @@ use crate::gpu_types::{GpuTerminalCell, TerminalUniforms};
 use crate::gpu_prep::TerminalCpuBuffer;
 use crate::renderer::TerminalTexture;
 use crate::atlas::GlyphAtlas;
+use crate::terminal::TERMINAL_SHADER_HANDLE;
 
 #[derive(Resource, ExtractResource, Clone)]
 pub struct ExtractedTerminalData {
@@ -148,7 +149,7 @@ impl FromWorld for TerminalComputePipeline {
             ],
         );
         
-        let shader = world.resource::<AssetServer>().load("shaders/terminal.wgsl");
+        let shader = TERMINAL_SHADER_HANDLE;
 
         Self { layout, shader }
     }

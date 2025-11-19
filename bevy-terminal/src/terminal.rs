@@ -7,7 +7,7 @@ use alacritty_terminal::sync::FairMutex;
 use alacritty_terminal::term::{Config as AlacConfig, Term};
 use alacritty_terminal::vte::ansi::Processor;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use bevy::asset::RenderAssetUsages;
+use bevy::asset::{RenderAssetUsages, load_internal_asset, uuid_handle};
 use bevy::prelude::*;
 use std::sync::Arc;
 use log::info;
@@ -19,6 +19,8 @@ use crate::pty;
 use crate::renderer;
 use crate::gpu_prep;
 use crate::render_node;
+
+pub const TERMINAL_SHADER_HANDLE: Handle<Shader> = uuid_handle!("be77e7aa-0000-0000-0000-000000000001");
 
 /// Simple dimensions struct for MVP (hardcoded 120×30).
 struct TerminalDimensions {
@@ -172,6 +174,13 @@ pub struct TerminalPlugin;
 impl Plugin for TerminalPlugin {
     fn build(&self, app: &mut App) {
         info!("🖥️  Initializing TerminalPlugin (render-to-texture)");
+
+        load_internal_asset!(
+            app,
+            TERMINAL_SHADER_HANDLE,
+            "../assets/shaders/terminal.wgsl",
+            Shader::from_wgsl
+        );
 
         app
             // Phase 1.1: PTY Spawning
