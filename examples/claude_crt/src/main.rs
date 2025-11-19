@@ -11,24 +11,50 @@
 //! - Press 'D' to toggle debug view
 
 use bevy::prelude::*;
+
+use bevy::window::{WindowMode, MonitorSelection};
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::asset::RenderAssetUsages;
 use bevy_terminal::prelude::*;
+use clap::Parser;
+
+
+#[derive(Parser, Debug, Clone, Resource)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+
+    /// Run in fullscreen mode
+    #[arg(long)]
+    fullscreen: bool,
+}
 
 fn main() {
-    App::new()
-        .add_plugins(
-            DefaultPlugins
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: "Claude CRT Character - Terminal Demo".into(),
-                        resolution: (1920, 1080).into(),
-                        ..default()
-                    }),
+    let args = Args::parse();
+
+    let mut app = App::new();
+
+    let mode = if args.fullscreen {
+        WindowMode::BorderlessFullscreen(MonitorSelection::Current)
+    } else {
+        WindowMode::Windowed
+    };
+
+    app.add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "Claude CRT Character - Terminal Demo".into(),
+                    resolution: (1920, 1080).into(),
+                    mode,
                     ..default()
-                })
-                .set(ImagePlugin::default_nearest()), // Crisp pixels
-        )
+                }),
+                ..default()
+            })
+            .set(ImagePlugin::default_nearest())
+    );
+
+    app.add_plugins(bevy_brp_extras::BrpExtrasPlugin)
+        .insert_resource(args)
         .add_plugins(TerminalPlugin)
         .add_systems(Startup, setup)
         .add_systems(

@@ -20,6 +20,14 @@ pub fn prepare_terminal_cpu_buffer(
     atlas: Res<GlyphAtlas>,
     mut cpu_buffer: ResMut<TerminalCpuBuffer>,
 ) {
+    static mut CALL_COUNT: u32 = 0;
+    unsafe {
+        CALL_COUNT += 1;
+        if CALL_COUNT % 60 == 1 {
+            info!("🔄 prepare_terminal_cpu_buffer called {} times", CALL_COUNT);
+        }
+    }
+
     let term = term_state.term.lock();
     let grid = term.grid();
     let rows = term_state.rows;
@@ -70,14 +78,16 @@ pub fn prepare_terminal_cpu_buffer(
         }
     }
     
-    // Log first frame or periodically?
-    // Let's log if the first cell is unexpectedly zero
+    // Debug: Log what we're seeing in the grid
     if updates > 0 {
-        if cpu_buffer.cells[0].bg_color == 0 {
-            info!("⚠️  GPU Prep: Cell 0 has 0 background color! Row/Cols: {}/{}", rows, cols);
-        } else {
-             // info!("GPU Prep: Cell 0 BG: {:X}", cpu_buffer.cells[0].bg_color);
+        let mut non_space_count = 0;
+        for cell in &cpu_buffer.cells {
+            if cell.glyph_index != 0 && cell.glyph_index != atlas.get_glyph_index(' ').unwrap_or(0) {
+                non_space_count += 1;
+            }
         }
+        info!("🔍 GPU Prep: {} updates, {} non-space glyphs, cell[0] glyph={} bg={:X}",
+              updates, non_space_count, cpu_buffer.cells[0].glyph_index, cpu_buffer.cells[0].bg_color);
     }
 }
 

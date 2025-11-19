@@ -48,9 +48,9 @@ pub fn initialize_terminal_texture(
     let bg = TOKYO_NIGHT_BG;
     let mut texture_data = vec![0u8; (width * height * 4) as usize];
     for pixel in texture_data.chunks_exact_mut(4) {
-        pixel[0] = 255; // Red
-        pixel[1] = 0;
-        pixel[2] = 0;
+        pixel[0] = bg[0];
+        pixel[1] = bg[1];
+        pixel[2] = bg[2];
         pixel[3] = 255;
     }
 

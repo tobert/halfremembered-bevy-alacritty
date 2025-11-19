@@ -36,21 +36,9 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let width = uniforms.term_cols * uniforms.cell_width;
     let height = uniforms.term_rows * uniforms.cell_height;
 
-    // DEBUG: Check if width is valid
-    if (width == 0u) {
-         // Write Blue if width is 0 (Uniforms broken)
-         textureStore(output_texture, vec2<i32>(i32(pixel.x), i32(pixel.y)), vec4<f32>(0.0, 0.0, 1.0, 1.0));
-         return;
-    }
-    // DEBUG: Check if pixel is within bounds (normal logic), but if so, write GREEN to prove execution
     if (pixel.x >= width || pixel.y >= height) {
         return;
     }
-    
-    // If we got here, uniforms are valid and pixel is in bounds.
-    // Write GREEN.
-    textureStore(output_texture, vec2<i32>(i32(pixel.x), i32(pixel.y)), vec4<f32>(0.0, 1.0, 0.0, 1.0));
-    return;
 
     // Identify which cell we are in
     let cell_x = pixel.x / uniforms.cell_width;
@@ -58,13 +46,6 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let cell_index = cell_y * uniforms.term_cols + cell_x;
 
     let cell = grid[cell_index];
-
-    // DEBUG: Check for zero data
-    if (cell.bg_color == 0u) {
-        // Force RED if background is 0 (missing data)
-        textureStore(output_texture, vec2<i32>(i32(pixel.x), i32(pixel.y)), vec4<f32>(1.0, 0.0, 0.0, 1.0));
-        return;
-    }
 
     // Identify pixel within cell
     let intra_x = pixel.x % uniforms.cell_width;
@@ -85,13 +66,13 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // Load glyph pixel (using 0 mip level)
     // textureLoad requires i32 coordinates
     let glyph_color = textureLoad(atlas_texture, vec2<i32>(i32(atlas_x), i32(atlas_y)), 0);
-    let alpha = glyph_color.a; // Assuming alpha contains the shape
+    let alpha = glyph_color.a; // Alpha contains the glyph shape
 
-    // Blend colors
+    // Unpack foreground and background colors
     let fg = unpack_color(cell.fg_color);
     let bg = unpack_color(cell.bg_color);
 
-    // Simple alpha blend: result = fg * alpha + bg * (1 - alpha)
+    // Blend foreground/background based on glyph alpha
     let final_color = mix(bg, fg, alpha);
 
     // Write to output

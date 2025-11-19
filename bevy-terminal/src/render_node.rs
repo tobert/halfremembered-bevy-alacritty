@@ -35,7 +35,6 @@ pub struct TerminalGpuResources {
     pub cell_buffer: Buffer,
     pub uniform_buffer: Buffer,
     pub bind_group: BindGroup,
-    pub pipeline_id: CachedComputePipelineId,
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
@@ -77,8 +76,17 @@ fn update_extraction_resource(
     if let (Some(texture), Some(atlas), Some(state)) = (term_texture, atlas, term_state) {
         let atlas_cols = atlas.atlas_width / atlas.cell_width;
         let atlas_rows = atlas.atlas_height / atlas.cell_height;
-        
+
         if let Some(atlas_handle) = &atlas.texture_handle {
+            // Debug: Log what we're extracting
+            static mut EXTRACT_COUNT: u32 = 0;
+            unsafe {
+                EXTRACT_COUNT += 1;
+                if EXTRACT_COUNT % 60 == 1 && !cpu_buffer.cells.is_empty() {
+                    info!("📤 Extracting: {} cells, cell[0] bg={:X}", cpu_buffer.cells.len(), cpu_buffer.cells[0].bg_color);
+                }
+            }
+
             commands.insert_resource(ExtractedTerminalData {
                 cells: cpu_buffer.cells.clone(),
                 texture_handle: texture.handle.clone(),
@@ -98,6 +106,7 @@ fn update_extraction_resource(
 pub struct TerminalComputePipeline {
     pub layout: BindGroupLayout,
     pub shader: Handle<Shader>,
+    pub pipeline_id: CachedComputePipelineId,
 }
 
 impl FromWorld for TerminalComputePipeline {
@@ -148,10 +157,22 @@ impl FromWorld for TerminalComputePipeline {
                 },
             ],
         );
-        
+
         let shader = TERMINAL_SHADER_HANDLE;
 
-        Self { layout, shader }
+        // Queue the pipeline ONCE during initialization
+        let pipeline_cache = world.resource::<PipelineCache>();
+        let pipeline_id = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
+            label: Some(Cow::Borrowed("terminal_compute")),
+            layout: vec![layout.clone()],
+            push_constant_ranges: vec![],
+            shader: shader.clone(),
+            shader_defs: vec![],
+            entry_point: Some(Cow::Borrowed("main")),
+            zero_initialize_workgroup_memory: false,
+        });
+
+        Self { layout, shader, pipeline_id }
     }
 }
 
@@ -164,7 +185,16 @@ fn prepare_gpu_resources(
     extracted: Option<Res<ExtractedTerminalData>>,
     gpu_images: Res<RenderAssets<GpuImage>>,
 ) {
-    let Some(data) = extracted else { return };
+    let Some(data) = extracted else {
+        static mut WARN_COUNT: u32 = 0;
+        unsafe {
+            WARN_COUNT += 1;
+            if WARN_COUNT == 1 {
+                warn!("⚠️  prepare_gpu_resources: No ExtractedTerminalData!");
+            }
+        }
+        return;
+    };
     
     // 1. Uniforms
     let uniforms = TerminalUniforms {
@@ -176,6 +206,13 @@ fn prepare_gpu_resources(
         atlas_rows: data.atlas_rows,
         _padding: [0, 0],
     };
+
+    if uniforms.term_cols == 0 || uniforms.cell_width == 0 {
+        error!("⚠️  GPU Prep: Invalid uniforms! cols={}, width={}", uniforms.term_cols, uniforms.cell_width);
+    } else {
+        // info!("GPU Prep: Uniforms: {}x{} grid, {}x{} px cells", uniforms.term_cols, uniforms.term_rows, uniforms.cell_width, uniforms.cell_height);
+    }
+
     let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
         label: Some("terminal_uniforms"),
         contents: bytemuck::bytes_of(&uniforms),
@@ -190,21 +227,16 @@ fn prepare_gpu_resources(
     });
 
     // 3. Textures (Target)
-    let Some(output_gpu_image) = gpu_images.get(&data.texture_handle) else { return };
-    let Some(atlas_gpu_image) = gpu_images.get(&data.atlas_texture_handle) else { return };
+    let Some(output_gpu_image) = gpu_images.get(&data.texture_handle) else {
+        warn!("⚠️  prepare_gpu_resources: Missing output_gpu_image!");
+        return;
+    };
+    let Some(atlas_gpu_image) = gpu_images.get(&data.atlas_texture_handle) else {
+        warn!("⚠️  prepare_gpu_resources: Missing atlas_gpu_image!");
+        return;
+    };
 
-    // 4. Pipeline
-    let pipeline_id = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
-        label: Some(Cow::Borrowed("terminal_compute")),
-        layout: vec![compute_pipeline.layout.clone()],
-        push_constant_ranges: vec![],
-        shader: compute_pipeline.shader.clone(),
-        shader_defs: vec![],
-        entry_point: Some(Cow::Borrowed("main")),
-        zero_initialize_workgroup_memory: false,
-    });
-
-    // 5. Bind Group
+    // 4. Bind Group (pipeline is already queued in TerminalComputePipeline::from_world)
     let bind_group = render_device.create_bind_group(
         Some("terminal_bind_group"),
         &compute_pipeline.layout,
@@ -232,8 +264,15 @@ fn prepare_gpu_resources(
         cell_buffer,
         uniform_buffer,
         bind_group,
-        pipeline_id,
     });
+
+    static mut PREP_COUNT: u32 = 0;
+    unsafe {
+        PREP_COUNT += 1;
+        if PREP_COUNT == 1 {
+            info!("✅ TerminalGpuResources prepared successfully!");
+        }
+    }
 }
 
 struct TerminalNode;
@@ -245,11 +284,35 @@ impl Node for TerminalNode {
         world: &World,
     ) -> Result<(), NodeRunError> {
         let Some(gpu_resources) = world.get_resource::<TerminalGpuResources>() else {
-            // warn!("TerminalNode: Missing GpuResources");
+            static mut WARN_COUNT: u32 = 0;
+            unsafe {
+                WARN_COUNT += 1;
+                if WARN_COUNT == 1 {
+                    warn!("⚠️  TerminalNode::run: Missing GpuResources!");
+                }
+            }
             return Ok(());
         };
+        
+        // throttle logging
+        /*
+        if bevy::utils::SystemTime::now().duration_since(bevy::utils::SystemTime::UNIX_EPOCH).unwrap().as_secs() % 5 == 0 {
+             info!("TerminalNode::run executing");
+        }
+        */
+
         let pipeline_cache = world.resource::<PipelineCache>();
-        let Some(pipeline) = pipeline_cache.get_compute_pipeline(gpu_resources.pipeline_id) else { return Ok(()) };
+        let compute_pipeline = world.resource::<TerminalComputePipeline>();
+        let Some(pipeline) = pipeline_cache.get_compute_pipeline(compute_pipeline.pipeline_id) else {
+            static mut PIPE_WARN: u32 = 0;
+            unsafe {
+                PIPE_WARN += 1;
+                if PIPE_WARN == 1 {
+                    warn!("⚠️  TerminalNode::run: Pipeline not ready yet!");
+                }
+            }
+            return Ok(());
+        };
         let extracted = world.resource::<ExtractedTerminalData>();
 
         // Calculate dispatch size
@@ -270,6 +333,16 @@ impl Node for TerminalNode {
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &gpu_resources.bind_group, &[]);
         pass.dispatch_workgroups(x_groups, y_groups, 1);
+
+        // Debug: Log dispatch
+        static mut FRAME_COUNT: u32 = 0;
+        unsafe {
+            FRAME_COUNT += 1;
+            if FRAME_COUNT == 1 {
+                info!("✅ Compute shader dispatched! workgroups: {}x{}, dims: {}x{}",
+                      x_groups, y_groups, width, height);
+            }
+        }
 
         Ok(())
     }

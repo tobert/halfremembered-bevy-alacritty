@@ -200,7 +200,7 @@ impl Plugin for TerminalPlugin {
             
             // Phase 3.5: GPU Rendering
             .init_resource::<gpu_prep::TerminalCpuBuffer>()
-            .add_systems(Update, gpu_prep::prepare_terminal_cpu_buffer)
+            .add_systems(Update, gpu_prep::prepare_terminal_cpu_buffer.after(pty::poll_pty))
             .add_plugins(render_node::TerminalComputePlugin)
             ;
 

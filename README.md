@@ -52,6 +52,18 @@ halfremembered-launcher config-sync --server your-laptop
 
 See `docs/launcher-guide.md` for complete setup instructions.
 
+### Development Without Display (Headless GPU Rendering)
+
+For remote development, SSH sessions, or agent-driven iteration:
+
+```bash
+./run-headless.sh
+```
+
+Provides GPU-accelerated rendering via gamescope with full BRP support including screenshots. Perfect for visual debugging without a physical display.
+
+See `AGENT_GUIDE.md` for the complete BRP debugging workflow.
+
 ## Current Status: MVP Complete ✅
 
 **Phase 1: Terminal Backend** (Complete)
