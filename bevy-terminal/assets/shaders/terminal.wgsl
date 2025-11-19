@@ -36,9 +36,21 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let width = uniforms.term_cols * uniforms.cell_width;
     let height = uniforms.term_rows * uniforms.cell_height;
 
+    // DEBUG: Check if width is valid
+    if (width == 0u) {
+         // Write Blue if width is 0 (Uniforms broken)
+         textureStore(output_texture, vec2<i32>(i32(pixel.x), i32(pixel.y)), vec4<f32>(0.0, 0.0, 1.0, 1.0));
+         return;
+    }
+    // DEBUG: Check if pixel is within bounds (normal logic), but if so, write GREEN to prove execution
     if (pixel.x >= width || pixel.y >= height) {
         return;
     }
+    
+    // If we got here, uniforms are valid and pixel is in bounds.
+    // Write GREEN.
+    textureStore(output_texture, vec2<i32>(i32(pixel.x), i32(pixel.y)), vec4<f32>(0.0, 1.0, 0.0, 1.0));
+    return;
 
     // Identify which cell we are in
     let cell_x = pixel.x / uniforms.cell_width;
