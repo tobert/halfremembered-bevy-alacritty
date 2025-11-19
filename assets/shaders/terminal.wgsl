@@ -47,6 +47,22 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let cell = grid[cell_index];
 
+    // DEBUG DIAGNOSIS:
+    // 1. Check if we have valid background color in the buffer.
+    if (cell.bg_color != 0u) {
+        // We have data! Write the background color directly.
+        // This bypasses atlas sampling. If this works, we see a Blue screen (Tokyo Night).
+        // If we see text, it means the blending logic below was fine.
+        // But for now, let's just output BG.
+        // textureStore(output_texture, vec2<i32>(i32(pixel.x), i32(pixel.y)), unpack_color(cell.bg_color));
+        // return;
+    } else {
+        // cell.bg_color is 0. This is BAD. It means the buffer is empty or not uploaded.
+        // Write RED to indicate "No Data".
+        textureStore(output_texture, vec2<i32>(i32(pixel.x), i32(pixel.y)), vec4<f32>(1.0, 0.0, 0.0, 1.0));
+        return;
+    }
+
     // Identify pixel within cell
     let intra_x = pixel.x % uniforms.cell_width;
     let intra_y = pixel.y % uniforms.cell_height;
