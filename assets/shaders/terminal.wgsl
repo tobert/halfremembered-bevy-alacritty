@@ -33,13 +33,6 @@ fn unpack_color(packed: u32) -> vec4<f32> {
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let pixel = vec2<u32>(global_id.xy);
-    
-    // DEBUG: Force top-left corner to RED to verify shader is running
-    if (pixel.x < 10 && pixel.y < 10) {
-        textureStore(output_texture, vec2<i32>(i32(pixel.x), i32(pixel.y)), vec4<f32>(1.0, 0.0, 0.0, 1.0));
-        return;
-    }
-
     let width = uniforms.term_cols * uniforms.cell_width;
     let height = uniforms.term_rows * uniforms.cell_height;
 

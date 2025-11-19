@@ -15,7 +15,6 @@ use crate::gpu_types::{GpuTerminalCell, TerminalUniforms};
 use crate::gpu_prep::TerminalCpuBuffer;
 use crate::renderer::TerminalTexture;
 use crate::atlas::GlyphAtlas;
-use log::{info, warn};
 
 #[derive(Resource, ExtractResource, Clone)]
 pub struct ExtractedTerminalData {
@@ -158,7 +157,7 @@ impl FromWorld for TerminalComputePipeline {
 fn prepare_gpu_resources(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
-    render_queue: Res<RenderQueue>,
+    _render_queue: Res<RenderQueue>,
     pipeline_cache: Res<PipelineCache>,
     compute_pipeline: Res<TerminalComputePipeline>,
     extracted: Option<Res<ExtractedTerminalData>>,
@@ -249,23 +248,8 @@ impl Node for TerminalNode {
             return Ok(());
         };
         let pipeline_cache = world.resource::<PipelineCache>();
-        let Some(pipeline) = pipeline_cache.get_compute_pipeline(gpu_resources.pipeline_id) else {
-            use std::sync::atomic::{AtomicU32, Ordering};
-            static WAITING_COUNT: AtomicU32 = AtomicU32::new(0);
-            let c = WAITING_COUNT.fetch_add(1, Ordering::Relaxed);
-            if c % 60 == 0 {
-                 info!("⏳ TerminalNode: Waiting for pipeline compilation... ({})", c);
-            }
-            return Ok(());
-        };
+        let Some(pipeline) = pipeline_cache.get_compute_pipeline(gpu_resources.pipeline_id) else { return Ok(()) };
         let extracted = world.resource::<ExtractedTerminalData>();
-
-        // One-time log
-        use std::sync::atomic::{AtomicBool, Ordering};
-        static LOGGED: AtomicBool = AtomicBool::new(false);
-        if !LOGGED.swap(true, Ordering::Relaxed) {
-            info!("🚀 TerminalNode: FIRST DISPATCH! Pipeline ready.");
-        }
 
         // Calculate dispatch size
         // One thread per pixel
