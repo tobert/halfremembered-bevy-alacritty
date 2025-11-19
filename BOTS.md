@@ -137,6 +137,18 @@ If you must use double quotes (e.g., for shell variable expansion), you must esc
 | `jj abandon` | Discard the current change entirely. |
 | `jj git push -c @` | Push the current change to the remote. |
 
+### Shader Validation
+
+When working with WGSL shaders, use `naga-cli` to validate them ahead of time. Bevy uses `naga` internally, so if `naga` likes it, Bevy likely will too.
+
+```bash
+# Install (one-time)
+cargo install naga-cli
+
+# Validate
+naga assets/shaders/terminal.wgsl
+```
+
 ### Commit Description Format
 **The description is a letter to your future self and other agents.**
 ```
