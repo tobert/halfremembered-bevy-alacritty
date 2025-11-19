@@ -55,12 +55,16 @@ impl CharacterSets {
 pub struct GlyphAtlas {
     /// RGBA pixel data for atlas texture
     pub texture_data: Vec<u8>,
+    /// Bevy image handle for the atlas texture (for GPU access)
+    pub texture_handle: Option<Handle<Image>>,
     /// Atlas width in pixels
     pub atlas_width: u32,
     /// Atlas height in pixels
     pub atlas_height: u32,
-    /// Character to UV coordinate mapping
+    /// Character to UV coordinate mapping (Legacy/CPU)
     pub uv_map: HashMap<char, Rect>,
+    /// Character to flat index mapping (GPU)
+    pub glyph_index_map: HashMap<char, u32>,
     /// Cell width in pixels
     pub cell_width: u32,
     /// Cell height in pixels
@@ -107,6 +111,7 @@ impl GlyphAtlas {
         }
 
         let mut uv_map = HashMap::new();
+        let mut glyph_index_map = HashMap::new();
         let scaled_font = font_metrics.font.as_scaled(font_metrics.scale);
 
         info!(
@@ -151,15 +156,18 @@ impl GlyphAtlas {
                 ),
             };
             uv_map.insert(character, uv);
+            glyph_index_map.insert(character, index as u32);
         }
 
         info!("✅ Atlas generated: {} glyphs", uv_map.len());
 
         Ok(Self {
             texture_data,
+            texture_handle: None,
             atlas_width,
             atlas_height,
             uv_map,
+            glyph_index_map,
             cell_width,
             cell_height,
         })
@@ -177,6 +185,11 @@ impl GlyphAtlas {
     /// Returns None if character is not in atlas.
     pub fn get_uv(&self, character: char) -> Option<&Rect> {
         self.uv_map.get(&character)
+    }
+
+    /// Get the linear index for a character in the atlas.
+    pub fn get_glyph_index(&self, character: char) -> Option<u32> {
+        self.glyph_index_map.get(&character).copied()
     }
 }
 

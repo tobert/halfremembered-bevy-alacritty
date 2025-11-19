@@ -6,6 +6,8 @@ use alacritty_terminal::index::{Column, Line};
 use alacritty_terminal::sync::FairMutex;
 use alacritty_terminal::term::{Config as AlacConfig, Term};
 use alacritty_terminal::vte::ansi::Processor;
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use std::sync::Arc;
 use log::info;
@@ -15,6 +17,8 @@ use crate::font::FontMetrics;
 use crate::input;
 use crate::pty;
 use crate::renderer;
+use crate::gpu_prep;
+use crate::render_node;
 
 /// Simple dimensions struct for MVP (hardcoded 120×30).
 struct TerminalDimensions {
@@ -183,9 +187,12 @@ impl Plugin for TerminalPlugin {
             .add_systems(Startup, initialize_font_and_atlas)
             // Phase 3: Render to Texture
             .add_systems(Startup, renderer::initialize_terminal_texture.after(initialize_font_and_atlas))
-            .add_systems(Update, renderer::render_terminal_to_texture)
-            // TODO: Add events
-            // .add_event::<TerminalEvent>()
+            // .add_systems(Update, renderer::render_terminal_to_texture) // CPU Renderer disabled
+            
+            // Phase 3.5: GPU Rendering
+            .init_resource::<gpu_prep::TerminalCpuBuffer>()
+            .add_systems(Update, gpu_prep::prepare_terminal_cpu_buffer)
+            .add_plugins(render_node::TerminalComputePlugin)
             ;
 
         info!("✅ TerminalPlugin initialized");
@@ -202,14 +209,33 @@ impl Default for TerminalPlugin {
 ///
 /// Loads Cascadia Mono and generates the full glyph atlas with
 /// ASCII, box-drawing, and block element characters.
-fn initialize_font_and_atlas(mut commands: Commands) {
+fn initialize_font_and_atlas(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+) {
     info!("🔤 Loading font and generating glyph atlas...");
 
     let font_metrics = FontMetrics::load_cascadia_mono()
         .expect("Failed to load Cascadia Mono font");
 
-    let atlas = GlyphAtlas::generate_mvp(&font_metrics)
+    let mut atlas = GlyphAtlas::generate_mvp(&font_metrics)
         .expect("Failed to generate glyph atlas");
+
+    // Create GPU texture for atlas
+    let atlas_image = Image::new(
+        Extent3d {
+            width: atlas.atlas_width,
+            height: atlas.atlas_height,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        atlas.texture_data.clone(),
+        TextureFormat::Rgba8Unorm,
+        RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD,
+    );
+    
+    let atlas_handle = images.add(atlas_image);
+    atlas.texture_handle = Some(atlas_handle);
 
     info!(
         "✅ Font and atlas ready: {}×{} cells, {} glyphs",

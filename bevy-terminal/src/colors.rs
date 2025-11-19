@@ -1,58 +1,51 @@
-//! Terminal color schemes.
-//!
-//! MVP: Hardcoded Tokyo Night theme
+use alacritty_terminal::vte::ansi::Color;
 
-use bevy::prelude::*;
+/// Background color used for terminal (Tokyo Night Dark)
+pub const TOKYO_NIGHT_BG: [u8; 3] = [0x1a, 0x1b, 0x26];
 
-/// Tokyo Night background color as RGB bytes.
-pub const TOKYO_NIGHT_BG: [u8; 3] = [0x1a, 0x1b, 0x26]; // #1a1b26
-
-/// Tokyo Night color scheme (hardcoded for MVP)
-#[derive(Debug, Clone)]
-pub struct TokyoNightColors {
-    pub background: Color,
-    pub foreground: Color,
-    // Standard ANSI colors (0-7)
-    pub black: Color,
-    pub red: Color,
-    pub green: Color,
-    pub yellow: Color,
-    pub blue: Color,
-    pub magenta: Color,
-    pub cyan: Color,
-    pub white: Color,
-    // Bright ANSI colors (8-15)
-    pub bright_black: Color,
-    pub bright_red: Color,
-    pub bright_green: Color,
-    pub bright_yellow: Color,
-    pub bright_blue: Color,
-    pub bright_magenta: Color,
-    pub bright_cyan: Color,
-    pub bright_white: Color,
-}
-
-impl Default for TokyoNightColors {
-    fn default() -> Self {
-        Self {
-            background: Color::srgb_u8(0x16, 0x16, 0x1e),
-            foreground: Color::srgb_u8(0xc0, 0xca, 0xf5),
-            black: Color::srgb_u8(0x15, 0x16, 0x1e),
-            red: Color::srgb_u8(0xf7, 0x76, 0x8e),
-            green: Color::srgb_u8(0x9e, 0xce, 0x6a),
-            yellow: Color::srgb_u8(0xe0, 0xaf, 0x68),
-            blue: Color::srgb_u8(0x7a, 0xa2, 0xf7),
-            magenta: Color::srgb_u8(0xbb, 0x9a, 0xf7),
-            cyan: Color::srgb_u8(0x7d, 0xcf, 0xff),
-            white: Color::srgb_u8(0xa9, 0xb1, 0xd6),
-            bright_black: Color::srgb_u8(0x41, 0x48, 0x68),
-            bright_red: Color::srgb_u8(0xf7, 0x76, 0x8e),
-            bright_green: Color::srgb_u8(0x9e, 0xce, 0x6a),
-            bright_yellow: Color::srgb_u8(0xe0, 0xaf, 0x68),
-            bright_blue: Color::srgb_u8(0x7a, 0xa2, 0xf7),
-            bright_magenta: Color::srgb_u8(0xbb, 0x9a, 0xf7),
-            bright_cyan: Color::srgb_u8(0x7d, 0xcf, 0xff),
-            bright_white: Color::srgb_u8(0xc0, 0xca, 0xf5),
+/// Convert alacritty color to RGB array.
+///
+/// Handles named colors (using Tokyo Night theme) and RGB colors.
+pub fn convert_alacritty_color(color: Color) -> [u8; 3] {
+    match color {
+        Color::Named(named) => {
+            use alacritty_terminal::vte::ansi::NamedColor;
+            match named {
+                NamedColor::Black => [0x1a, 0x1b, 0x26],
+                NamedColor::Red => [0xf7, 0x76, 0x8e],
+                NamedColor::Green => [0x9e, 0xce, 0x6a],
+                NamedColor::Yellow => [0xe0, 0xaf, 0x68],
+                NamedColor::Blue => [0x7a, 0xa2, 0xf7],
+                NamedColor::Magenta => [0xbb, 0x9a, 0xf7],
+                NamedColor::Cyan => [0x7d, 0xcf, 0xff],
+                NamedColor::White => [0xc0, 0xca, 0xf5],
+                NamedColor::BrightBlack => [0x41, 0x4b, 0x6b],
+                NamedColor::BrightRed => [0xf7, 0x76, 0x8e],
+                NamedColor::BrightGreen => [0x9e, 0xce, 0x6a],
+                NamedColor::BrightYellow => [0xe0, 0xaf, 0x68],
+                NamedColor::BrightBlue => [0x7a, 0xa2, 0xf7],
+                NamedColor::BrightMagenta => [0xbb, 0x9a, 0xf7],
+                NamedColor::BrightCyan => [0x7d, 0xcf, 0xff],
+                NamedColor::BrightWhite => [0xc0, 0xca, 0xf5],
+                NamedColor::Foreground => [0xc0, 0xca, 0xf5],
+                NamedColor::Background => TOKYO_NIGHT_BG,
+                _ => [0xc0, 0xca, 0xf5], // Default to foreground
+            }
+        }
+        Color::Spec(rgb) => [rgb.r, rgb.g, rgb.b],
+        Color::Indexed(index) => {
+            // 256-color palette - for MVP, just use a simple mapping
+            match index {
+                0 => [0x1a, 0x1b, 0x26],  // Black
+                1 => [0xf7, 0x76, 0x8e],  // Red
+                2 => [0x9e, 0xce, 0x6a],  // Green
+                3 => [0xe0, 0xaf, 0x68],  // Yellow
+                4 => [0x7a, 0xa2, 0xf7],  // Blue
+                5 => [0xbb, 0x9a, 0xf7],  // Magenta
+                6 => [0x7d, 0xcf, 0xff],  // Cyan
+                7 => [0xc0, 0xca, 0xf5],  // White
+                _ => [0xc0, 0xca, 0xf5],  // Default
+            }
         }
     }
 }

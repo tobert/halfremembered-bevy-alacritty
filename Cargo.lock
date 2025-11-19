@@ -362,6 +362,7 @@ dependencies = [
  "alacritty_terminal",
  "anyhow",
  "bevy",
+ "bytemuck",
  "log",
  "portable-pty",
  "thiserror 2.0.17",

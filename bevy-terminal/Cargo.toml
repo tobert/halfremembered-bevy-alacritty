@@ -39,6 +39,7 @@ thiserror = { workspace = true }
 
 # Utilities
 log = { workspace = true }
+bytemuck = { version = "1.24.0", features = ["derive"] }
 
 [dev-dependencies]
 bevy = { workspace = true, default-features = true }
